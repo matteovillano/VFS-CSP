@@ -1,0 +1,13 @@
+# Object files
+*.o
+obj/
+
+# Binaries
+client
+server
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*~
