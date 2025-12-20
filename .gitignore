@@ -3,8 +3,8 @@
 obj/
 
 # Binaries
-client
-server
+/client
+/server
 
 # Editor files
 .vscode/
