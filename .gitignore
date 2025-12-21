@@ -11,3 +11,6 @@ obj/
 .idea/
 *.swp
 *~
+
+# Root directory
+root
