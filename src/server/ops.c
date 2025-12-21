@@ -9,12 +9,7 @@ extern int current_dir_fd;
 extern int sockfd;
 extern char *username;
 
-int check_path(int client_socket, int id, char *path) {
-    (void)client_socket;
-    (void)id;
-    (void)path;
-    return 0;   
-}
+
 
 int op_create(char *args[], int arg_count) {
     char msg[256];
@@ -33,7 +28,7 @@ int op_create(char *args[], int arg_count) {
     char *target_path = (strcmp(args[0], "-d") == 0) ? args[1] : args[0];
     
     // Validate path
-    if (check_path(0, 0, target_path) != 0) {
+    if (check_path(target_path) != 0) {
         send_string("err-Invalid path");
         return -1;
     }
@@ -82,8 +77,6 @@ int op_create(char *args[], int arg_count) {
 
 
 int op_changemod(char *args[], int arg_count) {
-    (void)args;
-    (void)arg_count;
     
     char msg[256];
 
@@ -99,6 +92,11 @@ int op_changemod(char *args[], int arg_count) {
 
     mode_t mode = (mode_t)strtol(args[1], NULL, 8);
 
+    if (check_path(args[0]) != 0) {
+        send_string("err-Invalid path");
+        return -1;
+    }
+
     if (fchmodat(current_dir_fd, args[0], mode, 0) == -1) {
         perror("chmod failed");
         send_string("err-Error changing permissions");
@@ -113,6 +111,16 @@ int op_move(char *args[], int arg_count) {
     char msg[256];
     if (arg_count != 2) {
         send_string("err-Usage: move <source> <destination>");
+        return -1;
+    }
+
+    if (check_path(args[0]) != 0) {
+        send_string("err-Invalid path");
+        return -1;
+    }
+
+    if (check_path(args[1]) != 0) {
+        send_string("err-Invalid path");
         return -1;
     }
 
@@ -147,6 +155,11 @@ int op_cd(char *args[], int arg_count) {
         return -1;
     }
     
+    if (check_path(args[0]) != 0) {
+        send_string("err-Invalid path");
+        return -1;
+    }
+
     int new_fd = openat(current_dir_fd, args[0], O_RDONLY | O_DIRECTORY);
     if (new_fd == -1) {
         perror("openat failed");
@@ -170,6 +183,10 @@ int op_list(char *args[], int arg_count) {
             return -1;
         }
     } else {
+        if (check_path(args[0]) != 0) {
+            send_string("err-Invalid path");
+            return -1;
+        }
         dir_fd = openat(current_dir_fd, args[0], O_RDONLY | O_DIRECTORY);
         if (dir_fd == -1) {
             perror("openat failed");
@@ -238,7 +255,7 @@ int op_read(char *args[], int arg_count) {
         return -1;
     }
 
-    if (check_path(0, 0, path) != 0) {
+    if (check_path(path) != 0) {
         send_string("err-Invalid path");
         return -1;
     }
@@ -294,7 +311,7 @@ int op_write(char *args[], int arg_count) {
         return -1;
     }
 
-    if (check_path(0, 0, path) != 0) {
+    if (check_path(path) != 0) {
         send_string("err-Invalid path");
         return -1;
     }
@@ -345,7 +362,7 @@ int op_delete(char *args[], int arg_count) {
     
     char *path = args[0];
     
-    if (check_path(0, 0, path) != 0) {
+    if (check_path(path) != 0) {
         send_string("err-Invalid path");
         return -1;
     }

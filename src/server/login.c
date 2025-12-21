@@ -7,7 +7,7 @@
 
 extern int root_dir_fd;
 extern int sockfd;
-int current_dir_fd;
+extern int current_dir_fd;
 char username[USERNAME_LENGTH];
 extern char *root_dir_path;
 

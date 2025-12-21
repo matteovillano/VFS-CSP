@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 
 int root_dir_fd; // Added semicolon
+int current_dir_fd;
 char *ip;
 int port;
 ClientSession sessions[MAX_CLIENTS];

@@ -21,5 +21,6 @@ int handle_client(int server_socket);
 int handle_user();
 int execute_command(char *command);
 int login(char *username);
+int check_path(char *path);
 
 #endif

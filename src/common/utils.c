@@ -1,6 +1,9 @@
 #include "common.h"
 
 extern int sockfd;
+// Global variables as specified
+extern int root_dir_fd;
+extern int current_dir_fd;
 
 int check_permissions(char *perm_str) {
     if (perm_str == NULL || strlen(perm_str) != 3) {
@@ -78,3 +81,8 @@ void restore_privileges() {
 uid_t get_real_uid() {
     return real_uid;
 }
+
+int check_path(char *path) {
+    (void)path;
+    return 0;
+ }
