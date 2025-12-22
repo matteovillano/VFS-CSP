@@ -9,7 +9,8 @@ extern int root_dir_fd;
 extern int sockfd;
 extern int current_dir_fd;
 char username[USERNAME_LENGTH];
-extern char *root_dir_path;
+extern char root_dir_path[];
+char current_dir_path[1024+USERNAME_LENGTH+2];
 
 
 int login(char *username) {
@@ -60,12 +61,16 @@ int login(char *username) {
 
     printf("Process identity switched to UID: %d, GID: %d\n", pwd->pw_uid, pwd->pw_gid);
     
-    //minimize_privileges();
+    
+   
     current_dir_fd = openat(root_dir_fd, username, O_RDONLY | O_DIRECTORY);
     if (current_dir_fd == -1) {
         perror("Failed to open user directory");
-        exit(-1);
+        return -1;
     }
+
+    snprintf(current_dir_path, sizeof(current_dir_path), "%s/%s", root_dir_path, username);
+    printf("current_dir_path: %s\n", current_dir_path);
     
 
     send_string("Login successful\n");

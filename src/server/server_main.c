@@ -10,7 +10,7 @@ char *ip;
 int port;
 ClientSession sessions[MAX_CLIENTS];
 
-char *root_dir_path; // Global variable
+char root_dir_path[1024]; // Global variable
 
 
 void cleanup_children(int sig) {
@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
 
     ip = DEFAULT_IP;
     port = DEFAULT_PORT;
-    root_dir_path = argv[1];
+    char *root_path = argv[1];
     if (argc > 2){
         ip= argv[2];
         if (inet_pton(AF_INET, ip, NULL) != 1) {
@@ -55,16 +55,23 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
     }
-    root_dir_fd = open_root_dir(root_dir_path);
+    retrive_users();
+    
+    init_privileges();
+    minimize_privileges();
+    
+    root_dir_fd = open_root_dir(root_path);
     if (root_dir_fd == -1) {
         fprintf(stderr, "Invalid root directory\n");
         exit(EXIT_FAILURE);
     }
 
-    retrive_users();
-    
-    init_privileges();
-    minimize_privileges();
+    printf("root_dir_fd: %d\n", root_dir_fd);
+
+    if (find_path(root_dir_path, sizeof(root_dir_path), root_dir_fd)){
+        perror("find_path failed");
+        exit(EXIT_FAILURE);
+    }
 
 
     int server_socket = create_server_socket(port); // Removed atoi as port is already int

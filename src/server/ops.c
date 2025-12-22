@@ -8,6 +8,8 @@ extern int root_dir_fd;
 extern int current_dir_fd;
 extern int sockfd;
 extern char *username;
+extern char root_dir_path[];
+extern char current_dir_path[];
 
 
 
@@ -115,12 +117,12 @@ int op_move(char *args[], int arg_count) {
     }
 
     if (check_path(args[0]) != 0) {
-        send_string("err-Invalid path");
+        send_string("err-Invalid source path");
         return -1;
     }
 
     if (check_path(args[1]) != 0) {
-        send_string("err-Invalid path");
+        send_string("err-Invalid destination path");
         return -1;
     }
 
@@ -168,6 +170,14 @@ int op_cd(char *args[], int arg_count) {
     }
     close(current_dir_fd);
     current_dir_fd = new_fd;
+    
+    // Update current_dir_path
+    char resolved[2048];
+    resolve_path(current_dir_path, args[0], resolved);
+    strncpy(current_dir_path, resolved, 1281);
+    current_dir_path[1281] = '\0';
+    
+    printf("Changed directory to: %s\n", current_dir_path);
     
     send_string("ok-Directory changed successfully.");
     return 0;

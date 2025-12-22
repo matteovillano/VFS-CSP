@@ -1,8 +1,9 @@
 #include "common.h"
+#include "server.h"
+#include "users.h"
+#include "ops.h"
 
 extern int sockfd;
-// Global variables as specified
-extern int root_dir_fd;
 extern int current_dir_fd;
 
 int check_permissions(char *perm_str) {
@@ -19,6 +20,7 @@ int check_permissions(char *perm_str) {
 
 int open_root_dir(char *root_dir) {
     struct stat st = {0};
+    mode_t old_umask = umask(0);
     if (stat(root_dir, &st) == -1) {
         if (mkdir(root_dir, 0777) == -1) {
             perror("mkdir");
@@ -26,7 +28,7 @@ int open_root_dir(char *root_dir) {
         }
         printf("Created root directory: %s\n", root_dir);
     }
-    mode_t old_umask = umask(0);
+    
     int fd = open(root_dir, O_RDONLY | O_DIRECTORY);
     if (fd == -1) {
         perror("open");
@@ -81,8 +83,3 @@ void restore_privileges() {
 uid_t get_real_uid() {
     return real_uid;
 }
-
-int check_path(char *path) {
-    (void)path;
-    return 0;
- }
