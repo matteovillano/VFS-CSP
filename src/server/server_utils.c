@@ -3,6 +3,7 @@
 
 extern char root_dir_path[];
 extern char current_dir_path[];
+extern char username[];
 
 int find_path(char* dest, int dest_size, int fd){
     char proc_path[64];
@@ -98,3 +99,29 @@ int check_path(char *path) {
     
     return -1;
  }
+
+int check_path_mine(char *path){
+    char my_path[2048];
+    resolve_path(root_dir_path, username, my_path);
+    char resolved[2048];
+
+    if (path[0] == '/') {
+        return -1; // absolute path not allowed
+    }
+    
+    // Resolve current_dir_path + path
+    resolve_path(current_dir_path, path, resolved);
+    
+    printf("Checking path: %s -> %s (Root: %s)\n", path, resolved, root_dir_path);
+
+    // Check if resolved path starts with root_dir_path
+    size_t my_len = strlen(my_path);
+    if (strncmp(resolved, my_path, my_len) == 0) {
+        // Ensure it's an exact match or a subdirectory (prevent /root vs /root_sibling)
+        if (resolved[my_len] == '\0' || resolved[my_len] == '/') {
+            return 0;
+        }
+    }
+    
+    return -1;
+}

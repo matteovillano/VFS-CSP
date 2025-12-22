@@ -22,6 +22,7 @@ int handle_user();
 int execute_command(char *command);
 int login(char *username);
 int check_path(char *path);
+int check_path_mine(char *path);
 int find_path(char* dest, int dest_size, int fd);
 int resolve_path(char *base, char *path, char *resolved);
 

@@ -30,7 +30,7 @@ int op_create(char *args[], int arg_count) {
     char *target_path = (strcmp(args[0], "-d") == 0) ? args[1] : args[0];
     
     // Validate path
-    if (check_path(target_path) != 0) {
+    if (check_path_mine(target_path) != 0) {
         send_string("err-Invalid path");
         return -1;
     }
@@ -94,7 +94,7 @@ int op_changemod(char *args[], int arg_count) {
 
     mode_t mode = (mode_t)strtol(args[1], NULL, 8);
 
-    if (check_path(args[0]) != 0) {
+    if (check_path_mine(args[0]) != 0) {
         send_string("err-Invalid path");
         return -1;
     }
@@ -116,12 +116,12 @@ int op_move(char *args[], int arg_count) {
         return -1;
     }
 
-    if (check_path(args[0]) != 0) {
+    if (check_path_mine(args[0]) != 0) {
         send_string("err-Invalid source path");
         return -1;
     }
 
-    if (check_path(args[1]) != 0) {
+    if (check_path_mine(args[1]) != 0) {
         send_string("err-Invalid destination path");
         return -1;
     }
@@ -265,7 +265,7 @@ int op_read(char *args[], int arg_count) {
         return -1;
     }
 
-    if (check_path(path) != 0) {
+    if (check_path_mine(path) != 0) {
         send_string("err-Invalid path");
         return -1;
     }
@@ -321,7 +321,7 @@ int op_write(char *args[], int arg_count) {
         return -1;
     }
 
-    if (check_path(path) != 0) {
+    if (check_path_mine(path) != 0) {
         send_string("err-Invalid path");
         return -1;
     }
@@ -372,7 +372,7 @@ int op_delete(char *args[], int arg_count) {
     
     char *path = args[0];
     
-    if (check_path(path) != 0) {
+    if (check_path_mine(path) != 0) {
         send_string("err-Invalid path");
         return -1;
     }

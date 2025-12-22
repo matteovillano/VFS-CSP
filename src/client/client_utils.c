@@ -48,6 +48,7 @@ void handle_user_input() {
       // Print "You: ..." locally
       printf("\r\033[KYou: %.*s", input_len + 1, input_buffer);
 
+      op_command(input_buffer);
       // Reset input buffer
       input_len = 0;
       memset(input_buffer, 0, BUFFER_SIZE);

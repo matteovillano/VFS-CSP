@@ -13,9 +13,9 @@ extern char root_dir_path[];
 char current_dir_path[1024+USERNAME_LENGTH+2];
 
 
-int login(char *username) {
-    
-    
+int login(char *usern) {
+    strncpy(username, usern, strlen(usern));
+    username[strlen(usern)] = '\0';    
 
     struct passwd *pwd = getpwnam(username); // get user info
     if (pwd == NULL) {
