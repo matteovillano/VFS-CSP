@@ -2,6 +2,7 @@
 #include "common.h"
 #include "users.h"
 #include "transfer.h"
+#include "concurrency.h"
 
 //global variables
 int root_dir_fd;
@@ -42,7 +43,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    
+    init_shared_memory();
     
     init_privileges();
     minimize_privileges();

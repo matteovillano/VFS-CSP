@@ -39,8 +39,18 @@ int open_root_dir(char *root_dir) {
 }
 
 int send_string(char *str){
-    write(sockfd, str, strlen(str));
-    if(strcspn(str, "\n") == strlen(str))
+    size_t len = strlen(str);
+    size_t sent = 0;
+    while(sent < len){
+        ssize_t n = write(sockfd, str + sent, len - sent);
+        if(n < 0){
+             perror("write");
+             return -1;
+        }
+        sent += n;
+    }
+
+    if(strcspn(str, "\n") == len)
         write(sockfd, "\n", 1);
     return 0;
 }

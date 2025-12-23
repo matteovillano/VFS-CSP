@@ -27,10 +27,11 @@ void refresh_line() {
 int handle_server_message() {
   char recv_buffer[BUFFER_SIZE];
   memset(recv_buffer, 0, BUFFER_SIZE);
-  int valread = read(sockfd, recv_buffer, BUFFER_SIZE);
+  int valread = read(sockfd, recv_buffer, BUFFER_SIZE - 1);
   if (valread <= 0)
     return 0; // Server disconnected or error
 
+  recv_buffer[valread] = '\0'; // Ensure null termination
   printf("\r\033[K");
   printf("Server: %s", recv_buffer);
   refresh_line(); // Restores your partial typing!

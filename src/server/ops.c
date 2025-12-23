@@ -3,6 +3,7 @@
 #include "common.h"
 #include "server.h"
 #include "transfer.h"
+#include "concurrency.h"
 #include <errno.h>
 
 #define PATH_LENGTH 1024
@@ -128,13 +129,38 @@ int op_move(char *args[], int arg_count) {
         send_string("err-Invalid destination path");
         return -1;
     }
+    
+    char source_path[PATH_MAX];
+    char destination_path[PATH_MAX];
+    resolve_path(current_dir_path, args[0], source_path);
+    resolve_path(current_dir_path, args[1], destination_path);
+    FileLock *source_lock = get_file_lock(source_path);
+    if (!source_lock) {
+        send_string("err-Server busy (too many locks)");
+        return -1;
+    }
+    FileLock *destination_lock = get_file_lock(destination_path);
+    if (!destination_lock) {
+        send_string("err-Server busy (too many locks)");
+        return -1;
+    }
+    writer_lock(source_lock);
+    writer_lock(destination_lock);
 
     if (renameat(current_dir_fd, args[0], current_dir_fd, args[1]) == -1) {
         perror("rename failed");
         send_string("err-Error moving file");
+        writer_unlock(source_lock);
+        release_file_lock(source_lock);
+        writer_unlock(destination_lock);
+        release_file_lock(destination_lock);
         return -1;
     }
 
+    writer_unlock(source_lock);
+    release_file_lock(source_lock);
+    writer_unlock(destination_lock);
+    release_file_lock(destination_lock);
     snprintf(msg, sizeof(msg), "ok-Moved %s to %s.", args[0], args[1]);
     send_string(msg);
     return 0;
@@ -180,8 +206,8 @@ int op_cd(char *args[], int arg_count) {
     strncpy(current_dir_path, resolved, 1281);
     current_dir_path[1281] = '\0';
     
-    printf("Changed directory to: %s\n", current_dir_path);
     
+    printf("Changed directory to: %s\n", current_dir_path);
     send_string("ok-Directory changed successfully.");
     return 0;
 }
@@ -272,15 +298,23 @@ int op_read(char *args[], int arg_count) {
         send_string("err-Invalid path");
         return -1;
     }
+    char resolved[2048];
+    resolve_path(current_dir_path, path, resolved);
+    FileLock *lock = get_file_lock(resolved);
+    reader_lock(lock);
 
     int fd = openat(current_dir_fd, path, O_RDONLY);
     if (fd == -1) {
+        reader_unlock(lock);
+        release_file_lock(lock);
         send_string("err-Error reading file");
         return -1;
     }
 
     if (offset > 0) {
         if (lseek(fd, offset, SEEK_SET) == -1) {
+            reader_unlock(lock);
+            release_file_lock(lock);
             close(fd);
             send_string("err-Error seeking file");
             return -1;
@@ -301,6 +335,8 @@ int op_read(char *args[], int arg_count) {
     }
     
     close(fd);
+    reader_unlock(lock);
+    release_file_lock(lock);
     return 0;
 }
 
@@ -328,6 +364,10 @@ int op_write(char *args[], int arg_count) {
         send_string("err-Invalid path");
         return -1;
     }
+    char resolved[2048];
+    resolve_path(current_dir_path, path, resolved);
+    FileLock *lock = get_file_lock(resolved);
+    writer_lock(lock);
 
     int flags = O_WRONLY | O_CREAT;
     if (!has_offset) {
@@ -337,12 +377,16 @@ int op_write(char *args[], int arg_count) {
     // Per spec: "if the file does not exist it is created with permission 0700"
     int fd = openat(current_dir_fd, path, flags, 0700);
     if (fd == -1) {
+        writer_unlock(lock);
+        release_file_lock(lock);
         send_string("err-Error opening file for writing");
         return -1;
     }
 
     if (has_offset && offset > 0) {
         if (lseek(fd, offset, SEEK_SET) == -1) {
+            writer_unlock(lock);
+            release_file_lock(lock);
             close(fd);
             send_string("err-Error seeking file");
             return -1;
@@ -358,12 +402,20 @@ int op_write(char *args[], int arg_count) {
             break;
         }
         if (write(fd, buf, n) != n) {
+            writer_unlock(lock);
+            release_file_lock(lock);
+            close(fd);
             perror("write failed");
             break; 
         }
     }
     
     close(fd);
+    
+    writer_unlock(lock);
+    release_file_lock(lock);
+
+    send_string("ok-File written successfully.");
     return 0;
 }
 
@@ -379,28 +431,38 @@ int op_delete(char *args[], int arg_count) {
         send_string("err-Invalid path");
         return -1;
     }
+    char resolved[2048];
+    resolve_path(current_dir_path, path, resolved);
+    FileLock *lock = get_file_lock(resolved);
+    writer_lock(lock);
 
     // Try to remove as file
-    if (unlinkat(current_dir_fd, path, 0) == -1) {
+    if (unlink(resolved) == -1) {
         // If it fails because it is a directory, try to remove as directory
         if (errno == EISDIR) {
             if (unlinkat(current_dir_fd, path, AT_REMOVEDIR) == -1) {
                 perror("unlinkat dir failed");
                 send_string("err-Error deleting directory");
+                writer_unlock(lock);
+                release_file_lock(lock);
                 return -1;
             }
         } else {
+            writer_unlock(lock);
+            release_file_lock(lock);
             perror("unlinkat file failed");
             send_string("err-Error deleting file");
             return -1;
         }
     }
-
+    writer_unlock(lock);
+    release_file_lock(lock);
     char msg[256];
     snprintf(msg, sizeof(msg), "ok-Deleted %s.", path);
     send_string(msg);
     return 0;
 }
+
 int op_transfer_request(char *args[],int arg_count){
     char path[PATH_LENGTH];
     
@@ -418,9 +480,15 @@ int op_transfer_request(char *args[],int arg_count){
         return -1;
     }
     resolve_path(current_dir_path, args[0], path);
+    FileLock *lock = get_file_lock(path);
+    reader_lock(lock);
     create_request(username, path, args[1]);
+    reader_unlock(lock);
+    release_file_lock(lock);
+    send_string("ok-Request handled by destination user.");
     return 0;
 }
+
 int op_accept(char *args[],int arg_count){
     char path[PATH_LENGTH];
     
@@ -442,6 +510,7 @@ int op_accept(char *args[],int arg_count){
     accept_req(id, path);
     return 0;
 }
+
 int op_reject(char *args[],int arg_count){
     if(arg_count != 1){
         send_string("err-Usage: reject <req_id>");
