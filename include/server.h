@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include "users.h"
 
 #define MAX_CLIENTS 10
 
@@ -17,6 +18,7 @@ typedef struct {
     pid_t pid;
     int pipe_fd_read;  // Parent reads from here (c_to_p[0])
     int pipe_fd_write; // Parent writes to here (p_to_c[1])
+    char username[USERNAME_LENGTH];
 } ClientSession;
 
 int handle_client(int server_socket);
@@ -28,6 +30,7 @@ int check_path_mine(char *path);
 int find_path(char* dest, int dest_size, int fd);
 int resolve_path(char *base, char *path, char *resolved);
 void cleanup_children(int sig);
+void handle_sigchld(int sig);
 
 
 #endif

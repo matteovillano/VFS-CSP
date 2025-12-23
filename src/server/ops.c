@@ -2,12 +2,13 @@
 #include "users.h"
 #include "common.h"
 #include "server.h"
+#include "transfer.h"
 #include <errno.h>
 
 extern int root_dir_fd;
 extern int current_dir_fd;
 extern int sockfd;
-extern char *username;
+extern char username[USERNAME_LENGTH];
 extern char root_dir_path[];
 extern char current_dir_path[];
 
@@ -399,17 +400,49 @@ int op_delete(char *args[], int arg_count) {
     return 0;
 }
 int op_transfer_request(char *args[],int arg_count){
-    (void)args;
-    (void)arg_count;
+
+    if(arg_count != 2){
+        send_string("err-Usage: transfer_request <path> <dest_user>");
+        return -1;
+    }
+    if(check_path_mine(args[0]) != 0){
+        send_string("err-Invalid path");
+        return -1;
+    }
+    if(user_exists(args[1])){
+        send_string("err-Invalid user");
+        return -1;
+    }
+    create_request(username, args[0], args[1]);
     return 0;
 }
 int op_accept(char *args[],int arg_count){
-    (void)args;
-    (void)arg_count;
+    if(arg_count != 2){
+        send_string("err-Usage: accept <req_id> <dest_path>");
+        return -1;
+    }
+    int id = atoi(args[0]);
+    if(id < 0){
+        send_string("err-Invalid request id");
+        return -1;
+    }
+    if(check_path_mine(args[1]) != 0){
+        send_string("err-Invalid path");
+        return -1;
+    }
+    accept_req(id, args[1]);
     return 0;
 }
 int op_reject(char *args[],int arg_count){
-    (void)args;
-    (void)arg_count;
+    if(arg_count != 1){
+        send_string("err-Usage: reject <req_id>");
+        return -1;
+    }
+    int id = atoi(args[0]);
+    if(id < 0){
+        send_string("err-Invalid request id");
+        return -1;
+    }
+    reject_req(id);
     return 0;
 }

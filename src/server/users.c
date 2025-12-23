@@ -1,9 +1,11 @@
 #include "common.h"
 #include "users.h"
+#include "server.h"
 
 
 
 extern int root_dir_fd;
+extern char root_dir_path[];
 
 User users[MAX_USERS];
 int user_count = 0;
@@ -23,11 +25,11 @@ void save_users_to_file() {
 }
 
 int user_exists(char *username) {
-    retrive_users();
+    //retrive_users();
     for (int i = 0; i < user_count; i++) {
-        if (strcmp(users[i].username, username) == 0) return 1;
+        if (strcmp(users[i].username, username) == 0) return 0;
     }
-    return 0;
+    return -1;
 }
 
 int create_user_persistance(char *username, int permissions) {
@@ -70,8 +72,13 @@ int delete_user_persistance(char *username) {
 }
 
 void retrive_users() {
-    restore_privileges();
-    int fd = openat(root_dir_fd, USERS_FILE, O_RDONLY);
+    //restore_privileges();
+
+    printf("Retrieving users...\n");
+    char path[2048];
+    resolve_path(root_dir_path, USERS_FILE, path);
+    printf("Path: %s\n", path);
+    int fd = open(path, O_RDONLY);
     if (fd == -1) return;
 
     if (read(fd, &user_count, sizeof(int)) != sizeof(int)) {
@@ -84,7 +91,7 @@ void retrive_users() {
     read(fd, users, sizeof(User) * user_count);
     close(fd);
     printf("Retrieved %d users.\n", user_count);
-    minimize_privileges();
+    //minimize_privileges();
 }
 
 
@@ -248,7 +255,7 @@ int create_user(char *username, int permissions) {
     if (user_count >= MAX_USERS) {
         return -1;
     }
-    if (user_exists(username)) {
+    if (user_exists(username) == 0) {
         printf("err-user already exists\n");
         return -1;
     }
@@ -279,7 +286,7 @@ int create_user(char *username, int permissions) {
 }
 
 int delete_user(char *username) {
-    if (!user_exists(username)) {
+    if (user_exists(username)) {
         printf("err-user does not exist\n");
         return -1;
     }

@@ -1,6 +1,7 @@
 #include "server.h"
 #include "common.h"
 #include "users.h"
+#include "transfer.h"
 
 //global variables
 int root_dir_fd;
@@ -41,7 +42,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    retrive_users();
+    
     
     init_privileges();
     minimize_privileges();
@@ -58,7 +59,7 @@ int main(int argc, char *argv[]) {
         perror("find_path failed");
         exit(EXIT_FAILURE);
     }
-
+    retrive_users();
 
     int server_socket = create_server_socket(port); // Removed atoi as port is already int
     if (server_socket == -1) {
@@ -81,6 +82,7 @@ int main(int argc, char *argv[]) {
 
     signal(SIGINT, cleanup_children);
     signal(SIGTERM, cleanup_children);
+    signal(SIGCHLD, handle_sigchld);
 
     while(1){
         FD_ZERO(&readfds);
@@ -125,25 +127,8 @@ int main(int argc, char *argv[]) {
         // Handle session pipes
         for (i = 0; i < MAX_CLIENTS; i++) {
             if (sessions[i].pid != -1 && FD_ISSET(sessions[i].pipe_fd_read, &readfds)) {
-                char msg[1024];
-                int bytes_read = read(sessions[i].pipe_fd_read, msg, sizeof(msg) - 1);
-                if (bytes_read > 0) {
-                    msg[bytes_read] = '\0';
-                    printf("[Parent] Received from child (PID %d): %s", sessions[i].pid, msg);
-                    printf("[PARENT] session[i].pipe_fd_write: %d\n",sessions[i].pipe_fd_write);
-                    write(sessions[i].pipe_fd_write, "hello\n", strlen("hello\n")+1);
-                } else {
-                    // Start of EOF or error - child likely closed/died
-                    if (bytes_read == 0) {
-                        printf("Child %d disconnected (pipe closed)\n", sessions[i].pid);
-                    } else {
-                        perror("read pipe");
-                    }
-                    close(sessions[i].pipe_fd_read);
-                    close(sessions[i].pipe_fd_write);
-                    sessions[i].pid = -1; // Free slot
-                    sessions[i].pipe_fd_read = -1;
-                }
+                parent_handle_msg(i);
+                    
             }
         }
     }

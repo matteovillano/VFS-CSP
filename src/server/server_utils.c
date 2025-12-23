@@ -21,6 +21,29 @@ void cleanup_children(int sig) {
     exit(0);
 }
 
+void handle_sigchld(int sig) {
+    (void)sig;
+    int status;
+    pid_t pid;
+
+    // Reap all dead children
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        printf("[Server] Child process %d died\n", pid);
+        
+        // Find and free session
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            if (sessions[i].pid == pid) {
+                close(sessions[i].pipe_fd_read);
+                close(sessions[i].pipe_fd_write);
+                sessions[i].pid = -1;
+                memset(sessions[i].username, 0, USERNAME_LENGTH);
+                printf("[Server] Freed session slot %d\n", i);
+                break;
+            }
+        }
+    }
+}
+
 int find_path(char* dest, int dest_size, int fd){
     char proc_path[64];
     ssize_t len;

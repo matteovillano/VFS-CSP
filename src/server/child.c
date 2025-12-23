@@ -1,6 +1,7 @@
 #include "server.h"
 #include "common.h"
 #include "users.h"
+#include "transfer.h"
 #include <signal.h>
 
 int sockfd;
@@ -36,7 +37,7 @@ int handle_client(int server_socket) {
         return -1;
     }
 
-    ClientSession *session = &sessions[slot];
+    //ClientSession *session = &sessions[slot];
 
     int p_to_c[2]; // Parent to Child
     int c_to_p[2]; // Child to Parent
@@ -92,10 +93,12 @@ int handle_client(int server_socket) {
         close(p_to_c[0]); // Close read end of parent-to-child
         close(c_to_p[1]); // Close write end of child-to-parent
 
-        session->pid = pid;
-        session->pipe_fd_read = c_to_p[0];  // Read from child
-        session->pipe_fd_write = p_to_c[1]; // Write to child
-        
+        sessions[slot].pid = pid;
+        sessions[slot].pipe_fd_read = c_to_p[0];  // Read from child
+        sessions[slot].pipe_fd_write = p_to_c[1]; // Write to child
+        printf("[PARENT] added session %d with pid %d and pipe fd %d %d\n", slot, pid, c_to_p[0], p_to_c[1]);
+
+
         return 0; // Success
     }
 }
@@ -150,17 +153,8 @@ int handle_user(){
         }
         if (FD_ISSET(pipe_read, &readfds)) {
             printf("[CHILD] There is something to read in pipe\n");
-            memset(buffer, 0, sizeof(buffer));
-            n = read(pipe_read, buffer, sizeof(buffer));    
-            if (n < 0) {
-                perror("Read failed");
-                break;
-            }
-            if (n == 0) {
-                printf("Parent disconnected\n");
-                break;
-            }
-            printf("Parent sent: %s\n", buffer);
+            ;
+            //child_handle_msg();
             
             // Send message to parent
             //char msg_to_parent[1100];
@@ -232,7 +226,7 @@ int execute_command(char *command) {
             }
         } else if (strcmp(args[0], "login") == 0) {
             // TODO login
-            if (user_exists(args[1])) {
+            if (!user_exists(args[1])) {
                 
                 login(args[1]);
             }else{

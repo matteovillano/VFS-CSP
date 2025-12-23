@@ -2,12 +2,14 @@
 #include "common.h"
 #include "users.h"
 #include "ops.h"
+#include "transfer.h"
 #include <sys/prctl.h>
 #include <signal.h>
 
 extern int root_dir_fd;
 extern int sockfd;
 extern int current_dir_fd;
+extern int pipe_read;
 char username[USERNAME_LENGTH];
 extern char root_dir_path[];
 char current_dir_path[1024+USERNAME_LENGTH+2];
@@ -75,83 +77,110 @@ int login(char *usern) {
 
     send_string("Login successful\n");
 
+    i_am_user();
+
+    fd_set readfds;
+    int max_fd;
+
     while(1){
-        char buffer[BUFFER_SIZE];
-        memset(buffer, 0, BUFFER_SIZE);
-        int n;
+        FD_ZERO(&readfds);
+        FD_SET(sockfd, &readfds);
+        FD_SET(pipe_read, &readfds);
 
-        n = recv(sockfd, buffer, BUFFER_SIZE, 0);
-        buffer[n+1] = '\0';
-        if (n < 0) {
-            perror("Recv failed");
-            exit(0);
-        }
-        if (n == 0) {
-            printf("Client disconnected\n");
-            exit(0);
-        }
-        buffer[strcspn(buffer, "\n")] = 0;
-        
-        char *args[10];
-        int arg_count = 0;
-        char *token = strtok(buffer, " ");
-        while (token != NULL && arg_count < 10) {
-            args[arg_count++] = token;
-            token = strtok(NULL, " ");
+        max_fd = (sockfd > pipe_read ? sockfd : pipe_read);
+
+        if (select(max_fd + 1, &readfds, NULL, NULL, NULL) < 0) {
+             if (errno == EINTR) continue;
+             perror("select");
+             exit(EXIT_FAILURE);
         }
 
-        if (arg_count == 0) continue;
+        // Check for message from parent
+        if (FD_ISSET(pipe_read, &readfds)) {
+             child_handle_msg();
+        }
 
-        if (strcmp(args[0], "create") == 0) {
-            op_create(&args[1], arg_count - 1);
+        // Check for message from client
+        if (FD_ISSET(sockfd, &readfds)) {
+            char buffer[BUFFER_SIZE];
+            memset(buffer, 0, BUFFER_SIZE);
+            int n;
+
+            n = recv(sockfd, buffer, BUFFER_SIZE, 0);
+            if (n < 0) {
+                perror("Recv failed");
+                exit(0);
+            }
+            if (n == 0) {
+                printf("Client disconnected\n");
+                exit(0);
+            }
+            // Ensure null termination for safety
+            if (n < BUFFER_SIZE) buffer[n] = '\0';
+            else buffer[BUFFER_SIZE - 1] = '\0';
+
+            buffer[strcspn(buffer, "\n")] = 0;
+            
+            char *args[10];
+            int arg_count = 0;
+            char *token = strtok(buffer, " ");
+            while (token != NULL && arg_count < 10) {
+                args[arg_count++] = token;
+                token = strtok(NULL, " ");
+            }
+
+            if (arg_count == 0) continue;
+
+            if (strcmp(args[0], "create") == 0) {
+                op_create(&args[1], arg_count - 1);
+            }
+            else if (strcmp(args[0], "chmod") == 0) {
+                op_changemod(&args[1], arg_count - 1);
+            }
+            else if (strcmp(args[0], "move") == 0) {
+                op_move(&args[1], arg_count - 1);
+            }
+            else if (strcmp(args[0], "upload") == 0) {
+                //send_string("i recived upload command\n");
+                op_upload(&args[1], arg_count - 1);
+            }
+            else if (strcmp(args[0], "download") == 0) {
+                //send_string("i recived download command\n");
+                op_download(&args[1], arg_count - 1);
+            }
+            else if (strcmp(args[0], "cd") == 0) {
+                op_cd(&args[1], arg_count - 1);
+            }
+            else if (strcmp(args[0], "list") == 0) {
+                op_list(&args[1], arg_count - 1);
+            }
+            else if (strcmp(args[0], "read") == 0) {
+                op_read(&args[1], arg_count - 1);
+            }
+            else if (strcmp(args[0], "write") == 0) {
+                op_write(&args[1], arg_count - 1);
+            }
+            else if (strcmp(args[0], "delete") == 0) {
+                op_delete(&args[1], arg_count - 1);
+            }
+            else if (strcmp(args[0], "transfer_request") == 0) {
+                //send_string("i recived transfer_request command\n");
+                op_transfer_request(&args[1], arg_count - 1);
+            }
+            else if (strcmp(args[0], "accept") == 0) {
+                //send_string("i recived accept command\n");
+                op_accept(&args[1], arg_count - 1);
+            }
+            else if (strcmp(args[0], "reject") == 0) {
+                //send_string("i recived reject command\n");
+                op_reject(&args[1], arg_count - 1);
+            }
+            else if (strcmp(args[0], "exit") == 0) {
+                 exit(0);
+            }
+            else {
+                send_string("err-Invalid command\n");
+            }
         }
-        else if (strcmp(args[0], "chmod") == 0) {
-            op_changemod(&args[1], arg_count - 1);
-        }
-        else if (strcmp(args[0], "move") == 0) {
-            op_move(&args[1], arg_count - 1);
-        }
-        else if (strcmp(args[0], "upload") == 0) {
-            //send_string("i recived upload command\n");
-            op_upload(&args[1], arg_count - 1);
-        }
-        else if (strcmp(args[0], "download") == 0) {
-            //send_string("i recived download command\n");
-            op_download(&args[1], arg_count - 1);
-        }
-        else if (strcmp(args[0], "cd") == 0) {
-            op_cd(&args[1], arg_count - 1);
-        }
-        else if (strcmp(args[0], "list") == 0) {
-            op_list(&args[1], arg_count - 1);
-        }
-        else if (strcmp(args[0], "read") == 0) {
-            op_read(&args[1], arg_count - 1);
-        }
-        else if (strcmp(args[0], "write") == 0) {
-            op_write(&args[1], arg_count - 1);
-        }
-        else if (strcmp(args[0], "delete") == 0) {
-            op_delete(&args[1], arg_count - 1);
-        }
-        else if (strcmp(args[0], "transfer_request") == 0) {
-            //send_string("i recived transfer_request command\n");
-            op_transfer_request(&args[1], arg_count - 1);
-        }
-        else if (strcmp(args[0], "accept") == 0) {
-            send_string("i recived accept command\n");
-            //op_accept(&args[1], arg_count - 1);
-        }
-        else if (strcmp(args[0], "reject") == 0) {
-            send_string("i recived reject command\n");
-            //op_reject(&args[1], arg_count - 1);
-        }
-        else if (strcmp(args[0], "exit") == 0) {
-             exit(0);
-        }
-        else {
-            send_string("err-Invalid command\n");
-        }
-        
     }
 }
