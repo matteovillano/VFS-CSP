@@ -83,6 +83,7 @@ int handle_client(int server_socket) {
         // Using global sockfd as per previous code, but updating to use local or passed var is better.
         sockfd = client_socket; 
         
+        retrive_users();
         handle_user();
         exit(0);
     } else {

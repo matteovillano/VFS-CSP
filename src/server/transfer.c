@@ -1,6 +1,8 @@
 #include "server.h"
 #include "common.h"
 #include "users.h"
+#include <fcntl.h>
+#include <pwd.h>
 
 #define PATH_LENGTH 1024
 
@@ -37,6 +39,43 @@ typedef struct req_list{
     struct req_list *next;
 } req_list;
 
+typedef struct dict{
+    int key;
+    int value;
+    struct dict *next;
+} dict;
+
+dict *dict_head = NULL;
+
+int append_dict(int key, int value){
+    dict *new_dict = malloc(sizeof(dict));
+    new_dict->key = key;
+    new_dict->value = value;
+    new_dict->next = dict_head;
+    dict_head = new_dict;
+    return 0;
+}
+
+int pop_dict(int key, int *value){
+    dict *curr = dict_head;
+    dict *prev = NULL;
+
+    while (curr != NULL) {
+        if (curr->key == key) {
+            *value = curr->value;
+            if (prev == NULL) {
+                dict_head = curr->next;
+            } else {
+                prev->next = curr->next;
+            }
+            free(curr);
+            return 0;
+        }
+        prev = curr;
+        curr = curr->next;
+    }
+    return -1;
+}
 req_list *req_list_head = NULL;
 int req_counter = 0;
 
@@ -189,6 +228,7 @@ int accept_req(int id, char *dest){
     memset(&msg, 0, sizeof(msg));
     msg.status = ACCEPT;
     msg.req.id = id;
+    strcpy(msg.req.sender, username);
     strcpy(msg.req.path, dest);
 
     int ret = send_transfer_msg(pipe_write, &msg);
@@ -233,16 +273,16 @@ int i_am_user(){
     return 0;
 }
 
-int send_handled_msg(int id){
+int send_handled_msg(int session){
     transfer_msg msg;
     memset(&msg, 0, sizeof(msg));
     msg.status = HANDLED;
-    msg.req.id = id;
+    msg.req.id = 0;
     strcpy(msg.req.path, "");
     strcpy(msg.req.sender, "");
     strcpy(msg.req.receiver, "");
 
-    int ret = send_transfer_msg(pipe_write, &msg);
+    int ret = send_transfer_msg(sessions[session].pipe_fd_write, &msg);
     if (ret < 0){
         exit(EXIT_FAILURE);
     }
@@ -285,6 +325,71 @@ int child_handle_msg(){
 
 
 //parent operations
+//parent operations
+int perform_transfer(char *source, char *dest, char *receiver){
+    int src_fd, dest_fd;
+    ssize_t nread;
+    char buffer[4096];
+    struct passwd *pwd;
+
+    restore_privileges();
+
+    printf("[PARENT] Transferring %s to %s for user %s\n", source, dest, receiver);
+
+    // Open source file
+    src_fd = open(source, O_RDONLY);
+    if (src_fd < 0) {
+        perror("[PARENT] Error opening source file");
+        minimize_privileges();
+        return -1;
+    }
+
+    // Open/Create destination file
+    // We open with 0644 initially, or 0600.
+    printf("[PARENT] Opening destination file %s\n", dest);
+    dest_fd = open(dest, O_WRONLY | O_CREAT | O_TRUNC, 0664);
+    if (dest_fd < 0) {
+        perror("[PARENT] Error opening destination file");
+        close(src_fd);
+        minimize_privileges();
+        return -1; // Or retry/handle
+    }
+
+    // Copy loop
+    while ((nread = read(src_fd, buffer, sizeof(buffer))) > 0) {
+        if (write(dest_fd, buffer, nread) != nread) {
+            perror("[PARENT] Error writing to destination file");
+            close(src_fd);
+            close(dest_fd);
+            minimize_privileges();
+            return -1;
+        }
+    }
+
+    if (nread < 0) {
+        perror("[PARENT] Error reading source file");
+    }
+
+    close(src_fd);
+    close(dest_fd);
+
+    // Change ownership of the destination file to the receiver
+    pwd = getpwnam(receiver);
+    if (pwd != NULL) {
+        if (chown(dest, pwd->pw_uid, pwd->pw_gid) < 0) {
+            perror("[PARENT] Error changing ownership");
+            // Not fatal to the transfer itself, but good to log
+        }
+    } else {
+        printf("[PARENT] Warning: Receiver user '%s' not found, ownership not changed\n", receiver);
+    }
+    
+    minimize_privileges();
+    return 0;
+}
+
+
+
 int parent_handle_msg(int i){
 
     transfer_msg msg;
@@ -300,6 +405,8 @@ int parent_handle_msg(int i){
     
     printf("Parent received message:\n id: %d\n status: %d\n sender: %s\n receiver: %s\n path: %s\n", msg.req.id, msg.status, msg.req.sender, msg.req.receiver, msg.req.path);
 
+    transfer_request item_req;
+
     switch (msg.status){
         case NEW_REQ:
             printf("[MAIN] im handling a new request\n");
@@ -310,6 +417,8 @@ int parent_handle_msg(int i){
             strcpy(req.receiver, msg.req.receiver);
             strcpy(req.path, msg.req.path);
             append_req(req);
+
+            append_dict(req.id, i);
 
             transfer_msg who_are_you_msg;
             who_are_you_msg.status = WHO_ARE_YOU;
@@ -329,12 +438,33 @@ int parent_handle_msg(int i){
             // Received an accept request from a child.
             // TODO: Forward to the sender child.
             printf("Processing ACCEPT from %s to %s file %s\n", msg.req.sender, msg.req.receiver, msg.req.path);
+
+            if (pop_req_id(msg.req.id, &item_req) == 0) {
+                if (strcmp(msg.req.sender, item_req.receiver) == 0) {
+                    perform_transfer(item_req.path, msg.req.path, item_req.receiver);
+                    transfer_msg handled_msg;
+                    handled_msg.status = HANDLED;
+                    handled_msg.req.id = item_req.id;
+                    for (int i = 0; i < MAX_CLIENTS; i++) {
+                        if (sessions[i].pid != -1 && strcmp(sessions[i].username, item_req.sender) == 0) {
+                            send_transfer_msg(sessions[i].pipe_fd_write, &handled_msg);
+                            break;
+                        }
+                    }
+                    int resp_i;
+                    pop_dict(msg.req.id, &resp_i);
+                    send_handled_msg(resp_i);
+                }else{
+                    append_req(item_req);
+                }
+            }
+            
             break;
 
         case REJECT:
             // Received a reject request from a child.
             // TODO: Forward to the sender child.
-            transfer_request item_req;
+            
             if (pop_req_id(msg.req.id, &item_req) == 0) {
                 if (strcmp(msg.req.sender, item_req.receiver) == 0) {
                     transfer_msg handled_msg;
@@ -346,12 +476,15 @@ int parent_handle_msg(int i){
                             break;
                         }
                     }
+                    int resp_i;
+                    pop_dict(msg.req.id, &resp_i);
+                    send_handled_msg(resp_i);
                 }else{
                     append_req(item_req);
                 }
             }
             
-            send_handled_msg(msg.req.id);
+            
             printf("Processing REJECT from %s to %s file %s\n", msg.req.sender, msg.req.receiver, msg.req.path);
             break;
 
