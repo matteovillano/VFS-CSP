@@ -8,6 +8,8 @@
 #include "common.h"
 #include <sys/select.h>
 #include <dirent.h>
+#include <signal.h>
+#include <sys/wait.h>
 
 #define MAX_CLIENTS 10
 
@@ -25,6 +27,7 @@ int check_path(char *path);
 int check_path_mine(char *path);
 int find_path(char* dest, int dest_size, int fd);
 int resolve_path(char *base, char *path, char *resolved);
+void cleanup_children(int sig);
 
 
 #endif

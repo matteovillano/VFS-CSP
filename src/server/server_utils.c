@@ -4,6 +4,22 @@
 extern char root_dir_path[];
 extern char current_dir_path[];
 extern char username[];
+extern ClientSession sessions[];
+
+void cleanup_children(int sig) {
+    (void)sig; // unused
+    restore_privileges(); // Regain root to kill any user's process
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (sessions[i].pid > 0) {
+            if (kill(sessions[i].pid, SIGKILL) == 0) {
+                printf("[Server] Killed child process %d\n", sessions[i].pid);
+            } else {
+                perror("[Server] Failed to kill child process");
+            }
+        }
+    }
+    exit(0);
+}
 
 int find_path(char* dest, int dest_size, int fd){
     char proc_path[64];
@@ -86,7 +102,7 @@ int check_path(char *path) {
     // Resolve current_dir_path + path
     resolve_path(current_dir_path, path, resolved);
     
-    printf("Checking path: %s -> %s (Root: %s)\n", path, resolved, root_dir_path);
+    //printf("Checking path: %s -> %s (Root: %s)\n", path, resolved, root_dir_path);
 
     // Check if resolved path starts with root_dir_path
     size_t root_len = strlen(root_dir_path);
@@ -112,7 +128,7 @@ int check_path_mine(char *path){
     // Resolve current_dir_path + path
     resolve_path(current_dir_path, path, resolved);
     
-    printf("Checking path: %s -> %s (Root: %s)\n", path, resolved, root_dir_path);
+    //printf("Checking path: %s -> %s (Root: %s)\n", path, resolved, root_dir_path);
 
     // Check if resolved path starts with root_dir_path
     size_t my_len = strlen(my_path);

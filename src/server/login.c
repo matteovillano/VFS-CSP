@@ -112,12 +112,12 @@ int login(char *usern) {
             op_move(&args[1], arg_count - 1);
         }
         else if (strcmp(args[0], "upload") == 0) {
-            send_string("i recived upload command\n");
-            //op_upload(&args[1], arg_count - 1);
+            //send_string("i recived upload command\n");
+            op_upload(&args[1], arg_count - 1);
         }
         else if (strcmp(args[0], "download") == 0) {
-            send_string("i recived download command\n");
-            //op_download(&args[1], arg_count - 1);
+            //send_string("i recived download command\n");
+            op_download(&args[1], arg_count - 1);
         }
         else if (strcmp(args[0], "cd") == 0) {
             op_cd(&args[1], arg_count - 1);
@@ -135,8 +135,8 @@ int login(char *usern) {
             op_delete(&args[1], arg_count - 1);
         }
         else if (strcmp(args[0], "transfer_request") == 0) {
-            send_string("i recived transfer_request command\n");
-            //op_transfer_request(&args[1], arg_count - 1);
+            //send_string("i recived transfer_request command\n");
+            op_transfer_request(&args[1], arg_count - 1);
         }
         else if (strcmp(args[0], "accept") == 0) {
             send_string("i recived accept command\n");

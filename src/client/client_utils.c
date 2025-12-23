@@ -19,7 +19,7 @@ void enableRawMode() {
 
 void refresh_line() {
   printf("\r\033[K");
-  printf(">");
+  printf("> ");
   printf("%.*s", input_len, input_buffer);
   fflush(stdout);
 }
@@ -43,6 +43,9 @@ void handle_user_input() {
     if (c == '\n') {
       // User pressed Enter: send the message
       input_buffer[input_len] = '\n';
+      
+    
+      
       send(sockfd, input_buffer, input_len + 1, 0);
 
       // Print "You: ..." locally

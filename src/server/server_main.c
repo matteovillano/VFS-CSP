@@ -1,10 +1,9 @@
 #include "server.h"
 #include "common.h"
 #include "users.h"
-#include <signal.h>
-#include <sys/wait.h>
 
-int root_dir_fd; // Added semicolon
+//global variables
+int root_dir_fd;
 int current_dir_fd;
 char *ip;
 int port;
@@ -13,20 +12,6 @@ ClientSession sessions[MAX_CLIENTS];
 char root_dir_path[1024]; // Global variable
 
 
-void cleanup_children(int sig) {
-    (void)sig; // unused
-    restore_privileges(); // Regain root to kill any user's process
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (sessions[i].pid > 0) {
-            if (kill(sessions[i].pid, SIGKILL) == 0) {
-                printf("[Server] Killed child process %d\n", sessions[i].pid);
-            } else {
-                perror("[Server] Failed to kill child process");
-            }
-        }
-    }
-    exit(0);
-}
 
 int main(int argc, char *argv[]) {
     
@@ -55,6 +40,7 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
     }
+
     retrive_users();
     
     init_privileges();
@@ -121,7 +107,7 @@ int main(int argc, char *argv[]) {
 
         // Handle new connections
         if (FD_ISSET(server_socket, &readfds)){
-            
+    
             handle_client(server_socket);
         }
 

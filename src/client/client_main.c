@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
             }
         }
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
-            handle_user_input(sockfd);
+            handle_user_input();
         }
             
 

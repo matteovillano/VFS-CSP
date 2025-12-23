@@ -4,7 +4,7 @@
 
 int op_command(char *command) {
     
-    printf("I execute the command: %s\n", command);
+    //printf("I execute the command: %s\n", command);
     if (strncmp(command, "download ",9)==0)
         op_download(command);
     if (strncmp(command, "upload ",7)==0)
@@ -19,13 +19,13 @@ int op_command(char *command) {
 
 
 int op_download(char *command) {
-    
+    (void)command;
     
     return 0;
 }
 
 int op_upload(char *command) {
-    
+    (void)command;
     
     return 0;
 }

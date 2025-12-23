@@ -3,8 +3,7 @@
 #include "users.h"
 #include <signal.h>
 
-int sockfd; // Still need this for now if used elsewhere, but ideally remove global usage
-int global_pipe_write; // Helper for execute_command if needed, or pass it down
+int sockfd;
 extern ClientSession sessions[MAX_CLIENTS];
 int pipe_read;
 int pipe_write;

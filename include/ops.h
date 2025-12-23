@@ -13,5 +13,11 @@ int op_list(char *args[], int arg_count);
 int op_read(char *args[], int arg_count);
 int op_write(char *args[], int arg_count);
 int op_delete(char *args[], int arg_count);
+int op_upload(char *args[], int arg_count);
+int op_download(char *args[], int arg_count);
+int op_transfer_request(char *args[], int arg_count);
+
+
+
 
 #endif
