@@ -185,7 +185,7 @@ int create_os_user(char *username) {
     if (pid == 0) {
         // Child process
         char gid_str[16];
-        snprintf(gid_str, sizeof(gid_str), "%d", getuid());
+        snprintf(gid_str, sizeof(gid_str), "%d", get_real_gid());
         execlp("useradd", "useradd", "-m", "-g", gid_str, username, NULL);
         perror("execlp useradd failed");
         return -1;
@@ -276,7 +276,7 @@ int create_user(char *username, int permissions) {
         printf("err-user not created\n");
         return -1;
     } else {
-        printf("user created\n");
+        //printf("user created\n");
         return 0;
     }
 

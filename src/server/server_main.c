@@ -117,13 +117,40 @@ int main(int argc, char *argv[]) {
         // Handle stdin
         if (FD_ISSET(STDIN_FILENO, &readfds)){
             // handle_input();
-             char buf[BUFFER_SIZE];
-             read(STDIN_FILENO, buf, sizeof(buf));
-             if (strcmp(buf, "exit\n") == 0){
-                 cleanup_children(0);
-                 exit(0);
-             }
+            char buf[BUFFER_SIZE];
+            read(STDIN_FILENO, buf, sizeof(buf));
+            buf[strcspn(buf, "\n")] = 0;
+
+            char *args[3];
+            int arg_count = 0;
+            char *token = strtok(buf, " ");
+            while (token != NULL) {
+                if (arg_count >= 3) break;
+                args[arg_count++] = token;
+                token = strtok(NULL, " ");
+            }
+
+            if (arg_count == 1 && strcmp(args[0], "exit") == 0){
+                cleanup_children(0);
+                exit(0);
+            } else if (arg_count == 3 && strcmp(args[0], "create_user") == 0) {
+                // TODO create user
+                if (check_permissions(args[2]) < 0) {
+                    printf("err-invalid permissions\n");
+                } else {
+                    int permissions = (int)strtol(args[2], NULL, 8);
+                    int user = create_user(args[1], permissions);
+                    if (user == -1) {
+                        printf("err-user not created\n");
+                    } else {
+                        printf("user created\n");
+                    }
+                }
+            } else {
+                printf("err-Invalid command\n");
+            }
         }
+        
         
         // Handle session pipes
         for (i = 0; i < MAX_CLIENTS; i++) {

@@ -39,5 +39,6 @@ void init_privileges();
 void minimize_privileges();
 void restore_privileges();
 uid_t get_real_uid();
+gid_t get_real_gid();
 
 #endif

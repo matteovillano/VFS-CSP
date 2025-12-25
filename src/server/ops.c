@@ -167,14 +167,218 @@ int op_move(char *args[], int arg_count) {
 }
 
 
-int op_upload(char *args[],int arg_count){
-    (void)args;
-    (void)arg_count;
+int op_upload(char *args[], int arg_count) {
+    if (arg_count < 2) {
+        send_string("err-Usage: upload <client_path> <server_path>");
+        return -1;
+    }
+
+    // args[0] is client_path (ignored by server, but part of command)
+    // args[1] is server_path (destination)
+    char *dest_path_str = args[1];
+
+    if (check_path_mine(dest_path_str) != 0) {
+        send_string("err-Invalid path");
+        return -1;
+    }
+
+    char resolved[2048];
+    resolve_path(current_dir_path, dest_path_str, resolved);
+    
+    // Create socket for data transfer
+    int server_fd;
+    struct sockaddr_in address;
+    int addrlen = sizeof(address);
+
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        perror("socket failed");
+        send_string("err-Server error creating socket");
+        return -1;
+    }
+
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = 0; // Ephemeral port
+
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        perror("bind failed");
+        close(server_fd);
+        send_string("err-Server error binding socket");
+        return -1;
+    }
+
+    if (listen(server_fd, 1) < 0) {
+        perror("listen failed");
+        close(server_fd);
+        send_string("err-Server error listening");
+        return -1;
+    }
+
+    // Get the assigned port
+    if (getsockname(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen) == -1) {
+        perror("getsockname failed");
+        close(server_fd);
+        send_string("err-Server error getting port");
+        return -1;
+    }
+
+    int port = ntohs(address.sin_port);
+    char msg[64];
+    snprintf(msg, sizeof(msg), "ready-port-%d", port);
+    send_string(msg);
+
+    // Accept connection
+    int new_socket;
+    if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) < 0) {
+        perror("accept failed");
+        close(server_fd);
+        return -1;
+    }
+
+    // Prepare to write file
+    FileLock *lock = get_file_lock(resolved);
+    writer_lock(lock);
+
+    int fd = openat(current_dir_fd, dest_path_str, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd == -1) {
+        perror("openat failed");
+        close(new_socket);
+        close(server_fd);
+        writer_unlock(lock);
+        release_file_lock(lock);
+        return -1;
+    }
+
+    char buffer[BUFFER_SIZE];
+    int n;
+    while ((n = recv(new_socket, buffer, BUFFER_SIZE, 0)) > 0) {
+        if (write(fd, buffer, n) != n) {
+            perror("write failed");
+            break;
+        }
+    }
+
+    if (fchmod(fd, 0777) == -1) {
+        perror("fchmod failed");
+    }
+
+    close(fd);
+    close(new_socket);
+    close(server_fd);
+    writer_unlock(lock);
+    release_file_lock(lock);
+
+    send_string("ok-Upload successful.");
     return 0;
 }
-int op_download(char *args[],int arg_count){
-    (void)args;
-    (void)arg_count;
+int op_download(char *args[], int arg_count) {
+    if (arg_count < 2) {
+        send_string("err-Usage: download <server_path> <client_path>");
+        return -1;
+    }
+
+    char *server_path_str = args[0];
+    if (check_path_mine(server_path_str) != 0) {
+        send_string("err-Invalid path");
+        return -1;
+    }
+
+    char resolved[2048];
+    resolve_path(current_dir_path, server_path_str, resolved);
+    
+    FileLock *lock = get_file_lock(resolved);
+    reader_lock(lock);
+
+    int fd = openat(current_dir_fd, server_path_str, O_RDONLY);
+    if (fd == -1) {
+        perror("openat failed");
+        reader_unlock(lock);
+        release_file_lock(lock);
+        send_string("err-File not found or unreadable");
+        return -1;
+    }
+
+    // Create socket for data transfer
+    int server_fd;
+    struct sockaddr_in address;
+    int addrlen = sizeof(address);
+
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        perror("socket failed");
+        close(fd);
+        reader_unlock(lock);
+        release_file_lock(lock);
+        send_string("err-Server error creating socket");
+        return -1;
+    }
+
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = 0; // Ephemeral port
+
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        perror("bind failed");
+        close(server_fd);
+        close(fd);
+        reader_unlock(lock);
+        release_file_lock(lock);
+        send_string("err-Server error binding socket");
+        return -1;
+    }
+
+    if (listen(server_fd, 1) < 0) {
+        perror("listen failed");
+        close(server_fd);
+        close(fd);
+        reader_unlock(lock);
+        release_file_lock(lock);
+        send_string("err-Server error listening");
+        return -1;
+    }
+
+    // Get the assigned port
+    if (getsockname(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen) == -1) {
+        perror("getsockname failed");
+        close(server_fd);
+        close(fd);
+        reader_unlock(lock);
+        release_file_lock(lock);
+        send_string("err-Server error getting port");
+        return -1;
+    }
+
+    int port = ntohs(address.sin_port);
+    char msg[64];
+    snprintf(msg, sizeof(msg), "ready-port-%d", port);
+    send_string(msg);
+
+    // Accept connection
+    int new_socket;
+    if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) < 0) {
+        perror("accept failed");
+        close(server_fd);
+        close(fd);
+        reader_unlock(lock);
+        release_file_lock(lock);
+        return -1;
+    }
+
+    char buffer[BUFFER_SIZE];
+    int n;
+    while ((n = read(fd, buffer, sizeof(buffer))) > 0) {
+        if (send(new_socket, buffer, n, 0) != n) {
+            perror("send failed");
+            break;
+        }
+    }
+
+    close(fd);
+    close(new_socket);
+    close(server_fd);
+    reader_unlock(lock);
+    release_file_lock(lock);
+
+    send_string("ok-Download successful.");
     return 0;
 }
 
@@ -328,10 +532,19 @@ int op_read(char *args[], int arg_count) {
 
     char buf[1024];
     int n;
+    char last_char = '\n'; // Default to \n so empty files don't look weird or get extra line? 
+                           // Actually if empty, we print "ok-\n", then nothing. Client sees "ok-\n".
+                           // If file has text "abc", last_char='c'. We append \n.
+    
     while ((n = read(fd, buf, sizeof(buf))) > 0) {
         // Write directly to sockfd to avoid string processing issues (null termination, newlines)
         // with binary or large text chunks.
         write(sockfd, buf, n);
+        last_char = buf[n-1];
+    }
+    
+    if (last_char != '\n') {
+        write(sockfd, "\n", 1);
     }
     
     close(fd);

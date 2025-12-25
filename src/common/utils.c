@@ -93,3 +93,7 @@ void restore_privileges() {
 uid_t get_real_uid() {
     return real_uid;
 }
+
+gid_t get_real_gid() {
+    return real_gid;
+}
