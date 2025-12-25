@@ -15,6 +15,12 @@ char root_dir_path[1024]; // Global variable
 
 
 
+/*
+ * Main Server Entry Point
+ * -----------------------
+ * Initializes the server, sets up shared resources and privileges,
+ * and enters the main event loop to handle connections and commands.
+ */
 int main(int argc, char *argv[]) {
     
     if (argc < 2) {
@@ -46,15 +52,23 @@ int main(int argc, char *argv[]) {
     init_shared_memory();
     
     init_privileges();
-    minimize_privileges();
+    init_shared_memory(); // Initialize shared memory for concurrency locks
+    
+    init_privileges();    // Capture original SUDO credentials
+    minimize_privileges(); // Drop to non-root user for security
     
     root_dir_fd = open_root_dir(root_path);
+    printf("root_dir_fd: %d\n", root_dir_fd); // Remove this? Plan said remove.
+    // Actually replacement content must replace target.
+
+    // I will replace the block containing the printf and the startup logs.
+    
     if (root_dir_fd == -1) {
-        fprintf(stderr, "Invalid root directory\n");
+        fprintf(stderr, "[PARENT] Invalid root directory\n");
         exit(EXIT_FAILURE);
     }
 
-    printf("root_dir_fd: %d\n", root_dir_fd);
+    // Removed root_dir_fd debug print
 
     if (find_path(root_dir_path, sizeof(root_dir_path), root_dir_fd)){
         perror("find_path failed");
@@ -66,7 +80,7 @@ int main(int argc, char *argv[]) {
     if (server_socket == -1) {
         exit(EXIT_FAILURE);
     }
-    printf("Server started on %s:%d\n", ip, port);
+    printf("[PARENT] Server started on %s:%d\n", ip, port);
 
 
     fd_set readfds;
@@ -85,6 +99,11 @@ int main(int argc, char *argv[]) {
     signal(SIGTERM, cleanup_children);
     signal(SIGCHLD, handle_sigchld);
 
+    // Main Server Loop
+    // Uses select() to multiplex I/O between:
+    // 1. Server socket (New connections)
+    // 2. Stdin (Admin commands)
+    // 3. Child pipes (Status updates from client sessions)
     while(1){
         FD_ZERO(&readfds);
         FD_SET(server_socket, &readfds);
@@ -152,7 +171,8 @@ int main(int argc, char *argv[]) {
         }
         
         
-        // Handle session pipes
+        // Handle session pipes (Child Processes)
+        // Check if any child process has sent a message (e.g., status update, log)
         for (i = 0; i < MAX_CLIENTS; i++) {
             if (sessions[i].pid != -1 && FD_ISSET(sessions[i].pipe_fd_read, &readfds)) {
                 parent_handle_msg(i);

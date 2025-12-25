@@ -60,6 +60,12 @@ static uid_t real_uid = 0;
 static gid_t real_gid = 0;
 static int privileges_initialized = 0;
 
+/*
+ * init_privileges
+ * ---------------
+ * Captures the original SUDO_UID and SUDO_GID from environment variables.
+ * Allows the server to drop privileges to the original user and restore them when needed.
+ */
 void init_privileges() {
     const char *sudo_uid = getenv("SUDO_UID");
     const char *sudo_gid = getenv("SUDO_GID");
@@ -74,6 +80,12 @@ void init_privileges() {
     }
 }
 
+/*
+ * minimize_privileges
+ * -------------------
+ * Drops effective user ID to the non-root SUDO user.
+ * Used for most server operations to enhance security.
+ */
 void minimize_privileges() {
     if (!privileges_initialized) return;
 
@@ -82,6 +94,12 @@ void minimize_privileges() {
     }
 }
 
+/*
+ * restore_privileges
+ * ------------------
+ * Elevates effective user ID back to root (0).
+ * Used for critical operations like creating users or modifying protected files.
+ */
 void restore_privileges() {
     if (!privileges_initialized) return;
 

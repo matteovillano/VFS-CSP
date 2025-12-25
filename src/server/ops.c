@@ -17,6 +17,15 @@ extern char current_dir_path[];
 
 
 
+/*
+ * op_create
+ * ---------
+ * Creates a file or directory with specified permissions.
+ * Arguments:
+ *   - args: Command arguments (filename, permissions, or -d dirname permissions)
+ *   - arg_count: Number of arguments
+ * Returns: 0 on success, -1 on failure
+ */
 int op_create(char *args[], int arg_count) {
     char msg[256];
     
@@ -71,7 +80,7 @@ int op_create(char *args[], int arg_count) {
             perror("Error creating file");
             return -1;
         }
-        printf("File %s created successfully with permissions %o.\n", args[0], mode);
+        printf("[PID: %d] File %s created successfully with permissions %o.\n", getpid(), args[0], mode);
 
         close(fd);
 
@@ -167,15 +176,39 @@ int op_move(char *args[], int arg_count) {
 }
 
 
+/*
+ * op_upload
+ * ---------
+ * Handles file upload from client to server.
+ * Supports background operation with -b flag using fork().
+ * Protocol:
+ *   1. Server creates ephemeral socket.
+ *   2. Server sends port to client.
+ *   3. Client connects and transfers data.
+ * Locking: Uses Reader-Writer lock (writer mode) for file safety.
+ */
 int op_upload(char *args[], int arg_count) {
-    if (arg_count < 2) {
-        send_string("err-Usage: upload <client_path> <server_path>");
-        return -1;
+    int background = 0;
+    char *dest_path_str = NULL;
+    
+    // Simple argument parsing for -b
+    // Expected: upload <client_path> <server_path>
+    // Or: upload -b <client_path> <server_path>
+    
+    if (arg_count >= 1 && strcmp(args[0], "-b") == 0) {
+        background = 1;
+        if (arg_count < 3) {
+            send_string("err-Usage: upload -b <client_path> <server_path>");
+            return -1;
+        }
+        dest_path_str = args[2];
+    } else {
+        if (arg_count < 2) {
+            send_string("err-Usage: upload <client_path> <server_path>");
+            return -1;
+        }
+        dest_path_str = args[1];
     }
-
-    // args[0] is client_path (ignored by server, but part of command)
-    // args[1] is server_path (destination)
-    char *dest_path_str = args[1];
 
     if (check_path_mine(dest_path_str) != 0) {
         send_string("err-Invalid path");
@@ -184,6 +217,22 @@ int op_upload(char *args[], int arg_count) {
 
     char resolved[2048];
     resolve_path(current_dir_path, dest_path_str, resolved);
+
+    if (background) {
+        pid_t pid = fork();
+        if (pid < 0) {
+            perror("fork failed");
+            send_string("err-Server fork failed");
+            return -1;
+        } else if (pid > 0) {
+            // Parent
+            // Do NOT send anything to client here, as client waits for port from child.
+            // Just return to main loop.
+            return 0;
+        }
+        // Child process continues below
+        // We should close things we don't need, but we need sockfd to send the port.
+    }
     
     // Create socket for data transfer
     int server_fd;
@@ -192,7 +241,11 @@ int op_upload(char *args[], int arg_count) {
 
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
         perror("socket failed");
-        send_string("err-Server error creating socket");
+        if (!background) send_string("err-Server error creating socket");
+        else {
+             send_string("err-Server error creating socket");
+             exit(1); 
+        }
         return -1;
     }
 
@@ -203,14 +256,22 @@ int op_upload(char *args[], int arg_count) {
     if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
         perror("bind failed");
         close(server_fd);
-        send_string("err-Server error binding socket");
+        if (!background) send_string("err-Server error binding socket");
+        else {
+             send_string("err-Server error binding socket");
+             exit(1);
+        }
         return -1;
     }
 
     if (listen(server_fd, 1) < 0) {
         perror("listen failed");
         close(server_fd);
-        send_string("err-Server error listening");
+        if (!background) send_string("err-Server error listening");
+        else {
+             send_string("err-Server error listening");
+             exit(1);
+        }
         return -1;
     }
 
@@ -218,7 +279,11 @@ int op_upload(char *args[], int arg_count) {
     if (getsockname(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen) == -1) {
         perror("getsockname failed");
         close(server_fd);
-        send_string("err-Server error getting port");
+        if (!background) send_string("err-Server error getting port");
+        else {
+             send_string("err-Server error getting port");
+             exit(1);
+        }
         return -1;
     }
 
@@ -226,12 +291,18 @@ int op_upload(char *args[], int arg_count) {
     char msg[64];
     snprintf(msg, sizeof(msg), "ready-port-%d", port);
     send_string(msg);
+    
+    // If background child, we can now close sockfd as we don't need control channel anymore
+    if (background) {
+        close(sockfd);
+    }
 
     // Accept connection
     int new_socket;
     if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) < 0) {
         perror("accept failed");
         close(server_fd);
+        if (background) exit(1);
         return -1;
     }
 
@@ -246,6 +317,7 @@ int op_upload(char *args[], int arg_count) {
         close(server_fd);
         writer_unlock(lock);
         release_file_lock(lock);
+        if (background) exit(1);
         return -1;
     }
 
@@ -268,16 +340,53 @@ int op_upload(char *args[], int arg_count) {
     writer_unlock(lock);
     release_file_lock(lock);
 
-    send_string("ok-Upload successful.");
+    if (!background) {
+        send_string("ok-Upload successful.");
+        printf("[PID: %d] Upload finished: %s -> %s\n", getpid(), dest_path_str, resolved);
+    } else {
+        // Child doesn't need to send "ok" because parent already returned.
+        // Client side parent also returned.
+        // Client child is the one finishing.
+        // So we just exit.
+        printf("[PID: %d] Background Upload finished: %s -> %s\n", getpid(), dest_path_str, resolved);
+        exit(0);
+    }
     return 0;
 }
+/*
+ * op_download
+ * -----------
+ * Handles file download from server to client.
+ * Supports background operation with -b flag using fork().
+ * Protocol:
+ *   1. Server creates ephemeral socket.
+ *   2. Server sends port to client.
+ *   3. Server sends file data.
+ * Locking: Uses Reader-Writer lock (reader mode) for file safety.
+ */
 int op_download(char *args[], int arg_count) {
-    if (arg_count < 2) {
-        send_string("err-Usage: download <server_path> <client_path>");
-        return -1;
+    int background = 0;
+    char *server_path_str = NULL;
+    
+    // Simple argument parsing for -b
+    // Expected: download <server_path> <client_path>
+    // Or: download -b <server_path> <client_path>
+    
+    if (arg_count >= 1 && strcmp(args[0], "-b") == 0) {
+        background = 1;
+        if (arg_count < 3) {
+            send_string("err-Usage: download -b <server_path> <client_path>");
+            return -1;
+        }
+        server_path_str = args[1];
+    } else {
+        if (arg_count < 2) {
+            send_string("err-Usage: download <server_path> <client_path>");
+            return -1;
+        }
+        server_path_str = args[0];
     }
 
-    char *server_path_str = args[0];
     if (check_path_mine(server_path_str) != 0) {
         send_string("err-Invalid path");
         return -1;
@@ -286,6 +395,19 @@ int op_download(char *args[], int arg_count) {
     char resolved[2048];
     resolve_path(current_dir_path, server_path_str, resolved);
     
+    if (background) {
+        pid_t pid = fork();
+        if (pid < 0) {
+            perror("fork failed");
+            send_string("err-Server fork failed");
+            return -1;
+        } else if (pid > 0) {
+            // Parent: return immediately
+            return 0;
+        }
+        // Child process continues
+    }
+
     FileLock *lock = get_file_lock(resolved);
     reader_lock(lock);
 
@@ -294,7 +416,11 @@ int op_download(char *args[], int arg_count) {
         perror("openat failed");
         reader_unlock(lock);
         release_file_lock(lock);
-        send_string("err-File not found or unreadable");
+        if (!background) send_string("err-File not found or unreadable");
+        else {
+             send_string("err-File not found or unreadable");
+             exit(1);
+        }
         return -1;
     }
 
@@ -308,7 +434,11 @@ int op_download(char *args[], int arg_count) {
         close(fd);
         reader_unlock(lock);
         release_file_lock(lock);
-        send_string("err-Server error creating socket");
+        if (!background) send_string("err-Server error creating socket");
+        else {
+             send_string("err-Server error creating socket");
+             exit(1);
+        }
         return -1;
     }
 
@@ -322,7 +452,11 @@ int op_download(char *args[], int arg_count) {
         close(fd);
         reader_unlock(lock);
         release_file_lock(lock);
-        send_string("err-Server error binding socket");
+        if (!background) send_string("err-Server error binding socket");
+        else {
+             send_string("err-Server error binding socket");
+             exit(1);
+        }
         return -1;
     }
 
@@ -332,7 +466,11 @@ int op_download(char *args[], int arg_count) {
         close(fd);
         reader_unlock(lock);
         release_file_lock(lock);
-        send_string("err-Server error listening");
+        if (!background) send_string("err-Server error listening");
+        else {
+             send_string("err-Server error listening");
+             exit(1);
+        }
         return -1;
     }
 
@@ -343,7 +481,11 @@ int op_download(char *args[], int arg_count) {
         close(fd);
         reader_unlock(lock);
         release_file_lock(lock);
-        send_string("err-Server error getting port");
+        if (!background) send_string("err-Server error getting port");
+        else {
+             send_string("err-Server error getting port");
+             exit(1);
+        }
         return -1;
     }
 
@@ -351,6 +493,10 @@ int op_download(char *args[], int arg_count) {
     char msg[64];
     snprintf(msg, sizeof(msg), "ready-port-%d", port);
     send_string(msg);
+    
+    if (background) {
+        close(sockfd);
+    }
 
     // Accept connection
     int new_socket;
@@ -360,6 +506,7 @@ int op_download(char *args[], int arg_count) {
         close(fd);
         reader_unlock(lock);
         release_file_lock(lock);
+        if (background) exit(1);
         return -1;
     }
 
@@ -378,7 +525,13 @@ int op_download(char *args[], int arg_count) {
     reader_unlock(lock);
     release_file_lock(lock);
 
-    send_string("ok-Download successful.");
+    if (!background) {
+        send_string("ok-Download successful.");
+        printf("[PID: %d] Download finished: %s\n", getpid(), server_path_str);
+    } else {
+        printf("[PID: %d] Background Download finished: %s\n", getpid(), server_path_str);
+        exit(0);
+    }
     return 0;
 }
 
@@ -411,7 +564,8 @@ int op_cd(char *args[], int arg_count) {
     current_dir_path[1281] = '\0';
     
     
-    printf("Changed directory to: %s\n", current_dir_path);
+    // printf("Changed directory to: %s\n", current_dir_path); // Remove/Update?
+    printf("[PID: %d] Changed directory to: %s\n", getpid(), current_dir_path);
     send_string("ok-Directory changed successfully.");
     return 0;
 }
@@ -632,6 +786,12 @@ int op_write(char *args[], int arg_count) {
     return 0;
 }
 
+/*
+ * op_delete
+ * ---------
+ * Deletes a file or directory.
+ * Note: Uses unlinkat() with relative paths to work inside chroot jail.
+ */
 int op_delete(char *args[], int arg_count) {
     if (arg_count != 1) {
         send_string("err-Usage: delete <path>");
@@ -650,7 +810,7 @@ int op_delete(char *args[], int arg_count) {
     writer_lock(lock);
 
     // Try to remove as file
-    if (unlink(resolved) == -1) {
+    if (unlinkat(current_dir_fd, path, 0) == -1) {
         // If it fails because it is a directory, try to remove as directory
         if (errno == EISDIR) {
             if (unlinkat(current_dir_fd, path, AT_REMOVEDIR) == -1) {
@@ -673,6 +833,7 @@ int op_delete(char *args[], int arg_count) {
     char msg[256];
     snprintf(msg, sizeof(msg), "ok-Deleted %s.", path);
     send_string(msg);
+    printf("[PID: %d] Deleted %s\n", getpid(), path);
     return 0;
 }
 

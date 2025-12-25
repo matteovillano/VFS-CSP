@@ -67,9 +67,11 @@ Once connected, the following commands are available:
 - `write <path>`: Write data to a file (terminate with `EOF\n`).
 
 ### File Transfer
-- `upload <local_path> <remote_path>`: Upload a file to the server.
+- `upload [-b] <local_path> <remote_path>`: Upload a file to the server.
+    - `-b`: Run in background.
     - *Note*: Uploaded files are automatically set to `777` permissions.
-- `download <remote_path> <local_path>`: Download a file from the server.
+- `download [-b] <remote_path> <local_path>`: Download a file from the server.
+    - `-b`: Run in background.
 
 ## Technical Implementation
 

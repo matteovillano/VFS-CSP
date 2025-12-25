@@ -10,6 +10,16 @@ int pipe_read;
 int pipe_write;
 
 
+/*
+ * handle_client
+ * -------------
+ * Manages a new client connection.
+ * 1. Accepts the connection.
+ * 2. Finds a free session slot.
+ * 3. Creates pipes for Parent<->Child IPC.
+ * 4. Forks a child process to handle the session.
+ * 5. Parent tracks the child pid/pipes.
+ */
 int handle_client(int server_socket) {
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
@@ -20,7 +30,10 @@ int handle_client(int server_socket) {
         return -1;
     }
 
-    printf("New connection from %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+    // Log connection in parent only usually, but this is handled in child code after fork? 
+    // Wait, handle_client is called by parent, THEN forks.
+    // So this print executes in PARENT.
+    printf("[PARENT] New connection from %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
     // Find free slot
     int slot = -1;
@@ -106,13 +119,22 @@ int handle_client(int server_socket) {
 
 
 
+/*
+ * handle_user
+ * -----------
+ * Main loop for the child process.
+ * Uses select() to monitor:
+ * 1. Client socket (User commands)
+ * 2. Pipe from parent (Control messages)
+ */
 int handle_user(){
     char buffer[BUFFER_SIZE];
     int n;
     
 
 
-    printf("Handling client (PID: %d)\n", getpid());
+    // Removed "Handling client" debug
+    // printf("Handling client (PID: %d)\n", getpid());
 
     fd_set readfds;
     int max_fd;
@@ -143,7 +165,7 @@ int handle_user(){
                 break;
             }
             if (n == 0) {
-                printf("Client disconnected\n");
+                printf("[PID: %d] Client disconnected\n", getpid());
                 break;
             }
 
@@ -153,7 +175,7 @@ int handle_user(){
             execute_command(buffer);
         }
         if (FD_ISSET(pipe_read, &readfds)) {
-            printf("[CHILD] There is something to read in pipe\n");
+            // printf("[CHILD] There is something to read in pipe\n");
             ;
             //child_handle_msg();
             
@@ -173,6 +195,12 @@ int handle_user(){
     return 0;
 }
 
+/*
+ * execute_command
+ * ---------------
+ * Parses and executes user commands received over the socket.
+ * Dispatches to op_* functions or handles internal logic (login/create_user).
+ */
 int execute_command(char *command) {
    
     char *args[3];

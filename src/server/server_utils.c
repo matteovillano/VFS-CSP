@@ -44,6 +44,12 @@ void handle_sigchld(int sig) {
     }
 }
 
+/*
+ * find_path
+ * ---------
+ * Resolves the path of a given file descriptor using /proc/self/fd.
+ * Useful for debugging or recovering the path of an open directory.
+ */
 int find_path(char* dest, int dest_size, int fd){
     char proc_path[64];
     ssize_t len;
@@ -69,6 +75,13 @@ int find_path(char* dest, int dest_size, int fd){
 
 
 // Helper to canonicalize path lexically
+/*
+ * resolve_path
+ * ------------
+ * Lexically resolves a path against a base directory.
+ * Handles '.' and '..' components to create a canonical absolute path.
+ * DOES NOT access the filesystem (pure lexical analysis).
+ */
 int resolve_path(char *base, char *path, char *resolved) {
     char temp[2048];
     char *tokens[256];
@@ -139,6 +152,13 @@ int check_path(char *path) {
     return -1;
  }
 
+/*
+ * check_path_mine
+ * ---------------
+ * Security Check: Verifies that the requested path falls within the 
+ * logged-in user's dedicated directory.
+ * Prevents users from accessing other users' files or system files.
+ */
 int check_path_mine(char *path){
     char my_path[2048];
     resolve_path(root_dir_path, username, my_path);

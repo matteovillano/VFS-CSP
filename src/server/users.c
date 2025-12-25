@@ -11,6 +11,12 @@ User users[MAX_USERS];
 int user_count = 0;
 
 
+/*
+ * save_users_to_file
+ * ------------------
+ * Persists the current user list to disk.
+ * Temporarily restores privileges to write to the protected users file.
+ */
 void save_users_to_file() {
     restore_privileges();
     int fd = openat(root_dir_fd, USERS_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -168,6 +174,13 @@ int delete_user_folder(char *username) {
 }
 
 
+/*
+ * create_os_user
+ * --------------
+ * Creates a system user using the 'useradd' command.
+ * Forks and execs 'useradd'. Uses get_real_gid() to assign consistent group.
+ * Must run as root (privileges restored).
+ */
 int create_os_user(char *username) {
     
     restore_privileges();
@@ -250,6 +263,15 @@ int delete_os_user(char *username) {
 
 
 
+/*
+ * create_user
+ * -----------
+ * Orchestrates the creation of a full user entity:
+ * 1. Creates OS user.
+ * 2. adds user to persistence file.
+ * 3. Creates user specific folder.
+ * Handles rollback if any step fails.
+ */
 int create_user(char *username, int permissions) {
     
     if (user_count >= MAX_USERS) {

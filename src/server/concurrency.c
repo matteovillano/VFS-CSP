@@ -2,6 +2,12 @@
 
 static SharedState *shared_state = NULL;
 
+/*
+ * init_shared_memory
+ * ------------------
+ * Initializes shared memory segment using mmap and sets up
+ * global and per-file semaphores for concurrency control.
+ */
 void init_shared_memory() {
     // Create shared memory mapping
     shared_state = mmap(NULL, sizeof(SharedState), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
@@ -33,6 +39,12 @@ void init_shared_memory() {
     printf("Shared memory initialized for concurrency control.\n");
 }
 
+/*
+ * get_file_lock
+ * -------------
+ * Retrieves or creates a FileLock structure for a given path.
+ * Uses a global semaphore to ensure thread-safe access to the lock array.
+ */
 FileLock* get_file_lock(const char* path) {
     if (shared_state == NULL) {
         fprintf(stderr, "Shared memory not initialized!\n");
@@ -91,6 +103,12 @@ void release_file_lock(FileLock* lock) {
     sem_post(&shared_state->global_lock);
 }
 
+/*
+ * reader_lock
+ * -----------
+ * Acquires a read lock. Multiple readers can hold the lock simultaneously,
+ * but the first reader blocks any writers.
+ */
 void reader_lock(FileLock* lock) {
     if (lock == NULL) return;
 
@@ -113,6 +131,11 @@ void reader_unlock(FileLock* lock) {
     sem_post(&lock->mutex);
 }
 
+/*
+ * writer_lock
+ * -----------
+ * Acquires a write lock. Exclusive access; blocks all other readers and writers.
+ */
 void writer_lock(FileLock* lock) {
     if (lock == NULL) return;
     sem_wait(&lock->write_sem);
