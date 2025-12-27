@@ -36,7 +36,8 @@ int main(int argc, char *argv[]) {
     char *root_path = argv[1];
     if (argc > 2){
         ip= argv[2];
-        if (inet_pton(AF_INET, ip, NULL) != 1) {
+        struct in_addr addr;
+        if (inet_pton(AF_INET, ip, &addr) != 1) {
             fprintf(stderr, "Invalid IP address\n");
             exit(EXIT_FAILURE);
         }
