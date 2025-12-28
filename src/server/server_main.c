@@ -50,9 +50,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    init_shared_memory();
     
-    init_privileges();
     init_shared_memory(); // Initialize shared memory for concurrency locks
     
     init_privileges();    // Capture original SUDO credentials
@@ -75,6 +73,7 @@ int main(int argc, char *argv[]) {
         perror("find_path failed");
         exit(EXIT_FAILURE);
     }
+
     retrive_users();
 
     int server_socket = create_server_socket(port); // Removed atoi as port is already int
@@ -95,7 +94,7 @@ int main(int argc, char *argv[]) {
         sessions[i].pipe_fd_write = -1;
     }
 
-
+    // Initialize signal handlers
     signal(SIGINT, cleanup_children);
     signal(SIGTERM, cleanup_children);
     signal(SIGCHLD, handle_sigchld);

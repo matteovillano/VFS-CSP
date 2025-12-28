@@ -225,7 +225,7 @@ int execute_command(char *command) {
         send_string("err-invalid command\n");
         return 0;
     }
-
+/*
     if (arg_count == 3) {
         if (strcmp(args[0], "create_user") == 0) {
             // TODO create user
@@ -243,9 +243,10 @@ int execute_command(char *command) {
         } else {
             send_string("err-invalid command\n");
         }
-    } else if (arg_count == 2) {
+    } else*/
+    if (arg_count == 2) {
         /* it is not specified in the assignment but it is a valid command */
-        if (strcmp(args[0], "delete") == 0) {
+        /*if (strcmp(args[0], "delete") == 0) {
             // TODO delete user
             int ret = delete_user(args[1]);
             if (ret == -1) {
@@ -253,8 +254,10 @@ int execute_command(char *command) {
             } else {
                 send_string("user deleted\n");
             }
-        } else if (strcmp(args[0], "login") == 0) {
+        } else*/
+        if (strcmp(args[0], "login") == 0) {
             // TODO login
+            retrive_users();
             if (!user_exists(args[1])) {
                 
                 login(args[1]);

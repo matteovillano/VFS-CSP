@@ -2,6 +2,11 @@
 #include "client.h"
 
 
+extern char server_ip[];
+extern int sockfd;
+extern char input_buffer[];
+extern int input_len;
+
 int op_command(char *command) {
     
     //printf("I execute the command: %s\n", command);
@@ -13,8 +18,10 @@ int op_command(char *command) {
         op_upload(command);
         return -1;
     }
-    if (strcmp(command, "exit")==0)
+    if (strcmp(command, "exit")==0){
+        close(sockfd);
         exit(0);
+    }
     
     
     return 0;
@@ -22,10 +29,6 @@ int op_command(char *command) {
 }   
 
 
-extern char server_ip[];
-extern int sockfd;
-extern char input_buffer[];
-extern int input_len;
 
 /*
  * op_download
@@ -150,8 +153,7 @@ int op_download(char *command) {
     return 0;
 }
 
-extern char server_ip[];
-extern int sockfd;
+
 
 /*
  * op_upload

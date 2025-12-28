@@ -9,12 +9,14 @@ int input_len;
 
 void disableRawMode() { tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios); }
 
+//Enable raw mode for terminal input, sets stdin 
 void enableRawMode() {
-    tcgetattr(STDIN_FILENO, &orig_termios);
-    atexit(disableRawMode);
+    
+    tcgetattr(STDIN_FILENO, &orig_termios); //stores the original settings in orig_termios
+    atexit(disableRawMode); //ensures that disableRawMode is called on program exit
     struct termios raw = orig_termios;
-    raw.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+    raw.c_lflag &= ~(ICANON | ECHO); //sets to 0 the flags ICANON and ECHO
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw); //applies the changes to stdin
 }
 
 void refresh_line() {
@@ -24,6 +26,7 @@ void refresh_line() {
     fflush(stdout);
 }
 
+//Handles server messages, printing them locally
 int handle_server_message() {
     static int incomplete_line = 0;
     char recv_buffer[BUFFER_SIZE];
@@ -60,10 +63,6 @@ void handle_user_input() {
             int ret = op_command(input_buffer);
             if (ret == 0)
                 send(sockfd, input_buffer, input_len + 1, 0);
-
-            // Print "You: ..." locally
-            
-            
             
             // Reset input buffer
             input_len = 0;
