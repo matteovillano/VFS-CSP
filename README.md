@@ -169,6 +169,32 @@ These commands support a `-b` flag for running in the background.
     *   `Client: Downloading file local_doc.txt from server port 12345...`
     *   `Download successful.`
 
+### User-to-User File Transfer
+
+These commands allow users to transfer files safely between their own directories.
+
+#### Transfer Request
+*   **Command**: `transfer_request <path> <dest_user>`
+*   **Description**: Initiates a request to send a file to another user.
+*   **Example**: `transfer_request shared_doc.txt bob`
+*   **Expected Output**:
+    *   `Transfer request sent successfully`
+    *   `Waiting for response... I'm blocking` (The client blocks until the receiver accepts or rejects)
+
+#### Accept Transfer
+*   **Command**: `accept <req_id> <destination_path>`
+*   **Description**: Accepts a pending transfer request.
+*   **Example**: `accept 1 received_doc.txt`
+*   **Expected Output**:
+    *   (On Sender's side): `Transfer request handled successfully`
+
+#### Reject Transfer
+*   **Command**: `reject <req_id>`
+*   **Description**: Rejects a pending transfer request.
+*   **Example**: `reject 1`
+*   **Expected Output**:
+    *   (On Sender's side): `Transfer request rejected`
+
 ## 4. Server Console Commands
 
 The server terminal accepts administrative commands via standard input:
