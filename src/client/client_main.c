@@ -14,8 +14,8 @@ int main(int argc, char *argv[]) {
     strncpy(server_ip, DEFAULT_IP, INET_ADDRSTRLEN);
     server_port = DEFAULT_PORT;
     */
-    
-    if(argc != 4) {
+
+    if(argc != 3) {
         fprintf(stderr, "Usage: %s <ip> <port>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
