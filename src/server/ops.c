@@ -59,11 +59,15 @@ int op_create(char *args[], int arg_count) {
         }
         mode_t mode = (mode_t)strtol(args[2], NULL, 8);
 
+        mode_t old_umask = umask(0000);
+
         if (mkdirat(current_dir_fd, args[1], mode) == -1) {
             send_string("err-Error creating directory");
             perror("Error creating directory");
             return -1;
         }
+
+        umask(old_umask);
 
         snprintf(msg, sizeof(msg), "ok-Directory %s created successfully with permissions %o.", args[1], mode);
         send_string(msg);
@@ -74,12 +78,17 @@ int op_create(char *args[], int arg_count) {
         }
         mode_t mode = (mode_t)strtol(args[1], NULL, 8);
 
+        mode_t old_umask = umask(0000);
+
         int fd = openat(current_dir_fd, args[0], O_CREAT | O_WRONLY | O_EXCL, mode);
         if (fd == -1) {
             send_string("err-Error creating file");
             perror("Error creating file");
             return -1;
         }
+
+        umask(old_umask);
+        
         printf("[PID: %d] File %s created successfully with permissions %o.\n", getpid(), args[0], mode);
 
         close(fd);

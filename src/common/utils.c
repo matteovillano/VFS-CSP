@@ -44,8 +44,8 @@ int send_string(char *str){
     while(sent < len){
         ssize_t n = write(sockfd, str + sent, len - sent);
         if(n < 0){
-             perror("write");
-             return -1;
+            perror("write");
+            return -1;
         }
         sent += n;
     }
