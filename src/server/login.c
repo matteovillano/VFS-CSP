@@ -77,7 +77,7 @@ int login(char *usern) {
 
     send_string("Login successful\n");
 
-    i_am_user();
+    i_am_user();//to handle transfer_requests
 
     fd_set readfds;
     int max_fd;
@@ -97,7 +97,7 @@ int login(char *usern) {
 
         // Check for message from parent
         if (FD_ISSET(pipe_read, &readfds)) {
-             child_handle_msg();
+            child_handle_msg();
         }
 
         // Check for message from client

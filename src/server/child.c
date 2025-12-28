@@ -174,19 +174,7 @@ int handle_user(){
         
             execute_command(buffer);
         }
-        if (FD_ISSET(pipe_read, &readfds)) {
-            // printf("[CHILD] There is something to read in pipe\n");
-            ;
-            //child_handle_msg();
-            
-            // Send message to parent
-            //char msg_to_parent[1100];
-            //snprintf(msg_to_parent, sizeof(msg_to_parent), "User sent: %s\n", buffer);
-            //write(pipe_write, msg_to_parent, strlen(msg_to_parent));
-        }
-        
-        
-        
+
         
     }
     close(sockfd);

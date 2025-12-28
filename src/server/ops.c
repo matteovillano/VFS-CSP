@@ -876,7 +876,7 @@ int op_transfer_request(char *args[],int arg_count){
     create_request(username, path, args[1]);
     reader_unlock(lock);
     release_file_lock(lock);
-    send_string("ok-Request handled by destination user.");
+    //send_string("ok-Request handled by destination user.");
     return 0;
 }
 

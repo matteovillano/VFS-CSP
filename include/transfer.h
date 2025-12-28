@@ -28,7 +28,8 @@ typedef enum {
     I_M_USER,       //3
     NEW_REQ,        //4
     HANDLED,        //5
-    WHO_ARE_YOU     //6
+    REJECTED,       //6
+    WHO_ARE_YOU     //7
 } transfer_status;
 
 typedef struct{

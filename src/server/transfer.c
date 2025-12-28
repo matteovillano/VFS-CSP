@@ -177,7 +177,13 @@ int create_request(char *sender, char *path, char *receiver){
             perror("receive_transfer_msg");
             exit(EXIT_FAILURE);
         }
-        if (msg.status == HANDLED) break;
+        if (msg.status == REJECTED){
+            send_string("Transfer request rejected\n");
+            break;
+        }else if (msg.status == HANDLED){
+            send_string("Transfer request handled successfully\n");
+            break;
+        }
     }
     
     return 0;
@@ -237,6 +243,22 @@ int send_handled_msg(int session){
     transfer_msg msg;
     memset(&msg, 0, sizeof(msg));
     msg.status = HANDLED;
+    msg.req.id = 0;
+    strcpy(msg.req.path, "");
+    strcpy(msg.req.sender, "");
+    strcpy(msg.req.receiver, "");
+
+    int ret = send_transfer_msg(sessions[session].pipe_fd_write, &msg);
+    if (ret < 0){
+        exit(EXIT_FAILURE);
+    }
+
+    return 0;
+}
+int send_rejected_msg(int session){
+    transfer_msg msg;
+    memset(&msg, 0, sizeof(msg));
+    msg.status = REJECTED;
     msg.req.id = 0;
     strcpy(msg.req.path, "");
     strcpy(msg.req.sender, "");
@@ -427,18 +449,18 @@ int parent_handle_msg(int i){
             
             if (pop_req_id(msg.req.id, &item_req) == 0) {
                 if (strcmp(msg.req.sender, item_req.receiver) == 0) {
-                    transfer_msg handled_msg;
-                    handled_msg.status = HANDLED;
-                    handled_msg.req.id = item_req.id;
+                    transfer_msg rejected_msg;
+                    rejected_msg.status = REJECTED;
+                    rejected_msg.req.id = item_req.id;
                     for (int i = 0; i < MAX_CLIENTS; i++) {
                         if (sessions[i].pid != -1 && strcmp(sessions[i].username, item_req.sender) == 0) {
-                            send_transfer_msg(sessions[i].pipe_fd_write, &handled_msg);
+                            send_transfer_msg(sessions[i].pipe_fd_write, &rejected_msg);
                             break;
                         }
                     }
                     int resp_i;
                     pop_dict(msg.req.id, &resp_i);
-                    send_handled_msg(resp_i);
+                    send_rejected_msg(resp_i);
                 }else{
                     append_req(item_req);
                 }

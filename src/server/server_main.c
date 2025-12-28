@@ -23,16 +23,17 @@ char root_dir_path[1024]; // Global variable
  */
 int main(int argc, char *argv[]) {
     
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s <root_dir> [ip] [port]\n", argv[0]);
+    if (argc != 4) {
+        fprintf(stderr, "Usage: %s <root_dir> <ip> <port>\n", argv[0]);
         exit(EXIT_FAILURE);
     } else if (argc > 4) {
         fprintf(stderr, "too many arguments!!\n");
         exit(EXIT_FAILURE);
     }
-
+    /*
     ip = DEFAULT_IP;
     port = DEFAULT_PORT;
+    */
     char *root_path = argv[1];
     if (argc > 2){
         ip= argv[2];
