@@ -1,57 +1,62 @@
-# Secure File Sharing System
+# Secure File Sharing System: A Human-Friendly Guide
 
-This document describes how to compile, run, and usage the Secure Client-Server File System project.
+Welcome! This document will guide you through setting up and using your new Secure Client-Server File System. We've designed this to be robust and secure, but also easy to use.
 
-## 1. Compilation
+## 1. Getting Started
 
-To compile the project, use the provided `Makefile`. This will generate both the `server` and `client` executables.
+Before we can run anything, we need to build the project. We've included a `Makefile` to handle all the heavy lifting for you.
+
+Just open your terminal in the project folder and type:
 
 ```bash
 make
 ```
 
-To clean build artifacts:
+This command builds two executable files: `server` (the brain of the operation) and `client` (what you'll use to talk to the server).
+
+If you ever want to start fresh and remove these built files, simply run:
+
 ```bash
 make clean
 ```
 
-The `Makefile` serves as the automation script for compiling the project.
+## 2. Running the System
 
-## 2. Startup Instructions
+To get everything working, you'll need to start the server first, and then connect with the client.
 
-### Starting the Server
+### Step 1: Start the Server
 
-The server must be started first. It requires **root privileges** to manage user permissions and creating jails (chroot). Note that all 3 arguments are mandatory.
+The server does some heavy lifting (like managing users and permissions), so it needs to run with **root privileges**. We also need to tell it where to store everyone's files.
 
-**Usage:**
+**How to run it:**
+
+You need to provide three arguments:
+1.  **Root Directory**: Where you want all the files to be saved. **Bonus:** If this folder doesn't exist yet, we'll create it for you automatically!
+2.  **IP Address**: Usually `127.0.0.1` (localhost) if you're testing on your own machine.
+3.  **Port**: A number like `8080`.
+
+**Command:**
 ```bash
 sudo ./server <root_directory> <ip_address> <port>
 ```
 
 **Example:**
 ```bash
-# Create a storage directory
-mkdir -p /tmp/server_root
-
-# Start server on localhost port 8080
+# Let's start the server on localhost port 8080 and save files in /tmp/server_root
 sudo ./server /tmp/server_root 127.0.0.1 8080
 ```
 
-*   `<root_directory>`: The absolute path to the directory where user files will be stored.
-*   `<ip_address>`: The IP address to bind to (e.g., `127.0.0.1`).
-*   `<port>`: The port number to listen on (e.g., `8080`).
-
-**Expected Output:**
+**What you'll see:**
 ```
 Shared memory initialized for concurrency control.
 [PARENT] Server started on 127.0.0.1:8080
 ```
 
-### Starting the Client
+### Step 2: Start the Client
 
-The client connects to the running server.
+Now that the server is listening, open a **new terminal window** to start your client.
 
-**Usage:**
+**Command:**
 ```bash
 ./client <ip_address> <port>
 ```
@@ -61,145 +66,99 @@ The client connects to the running server.
 ./client 127.0.0.1 8080
 ```
 
-**Expected Output:**
+**What you'll see:**
 ```
 Connected to server at 127.0.0.1:8080
 >
 ```
+You are now connected! The `>` prompt means the system is ready for your commands.
 
-## 3. Implemented Commands
+## 3. Using the System
 
-Once the client is connected, you can interact with the server. Note that you must `login` before performing file operations.
+Here is everything you can do once you're connected.
 
-### Authentication
+### Logging In
+Before you can touch any files, you need to identify yourself.
 
 *   **Command**: `login <username>`
-*   **Description**: Logs in as an existing user.
 *   **Example**: `login user1`
-*   **Expected Output**:
-    *   Success: `> Welcome user1` (prompt updates)
-    *   Failure: `err-User unknown`
+*   **Success**: You'll see `> Welcome user1`, and your prompt will update.
 
-### File Management
+### Managing Your Files
 
-#### List Directory
-*   **Command**: `list [path]`
-*   **Description**: Lists the contents of the current directory or the specified path.
-*   **Example**: `list` or `list docs`
-*   **Expected Output**:
-    ```
-    file1.txt   Size: 123   Perms: 755
-    folder      Size: 4096  Perms: 755
-    ```
+Once logged in, you can manage files in your personal directory.
 
-#### Create File/Directory
-*   **Command**:
-    *   File: `create <filename> <permissions>`
-    *   Directory: `create -d <dirname> <permissions>`
-*   **Description**: Creates a new empty file or directory. Permissions are in octal (e.g., 0755).
-*   **Example**: `create notes.txt 0644` or `create -d photos 0755`
-*   **Expected Output**:
-    *   `ok-File notes.txt created successfully with permissions 644.`
-    *   `ok-Directory photos created successfully with permissions 755.`
+*   **See what's there**:
+    *   Command: `list` or `list <foldername>`
+    *   Shows you filenames, sizes, and permissions.
 
-#### Delete File/Directory
-*   **Command**: `delete <path>`
-*   **Description**: Deletes the file or directory at the specified path.
-*   **Example**: `delete notes.txt`
-*   **Expected Output**:
-    *   `ok-Deleted notes.txt.`
+*   **Create something new**:
+    *   **File**: `create <filename> <permissions>` (e.g., `create notes.txt 0644`)
+    *   **Folder**: `create -d <dirname> <permissions>` (e.g., `create -d photos 0755`)
+    *   *Note*: Permissions are in octal (like 0644 or 0755).
 
-#### Change Directory
-*   **Command**: `cd <path>`
-*   **Description**: Changes the current working directory.
-*   **Example**: `cd photos`
-*   **Expected Output**:
-    *   `ok-Directory changed successfully.`
+*   **Delete something**:
+    *   Command: `delete <path>` (e.g., `delete notes.txt`)
+    *   *Careful! This is permanent.*
 
-#### Move/Rename
-*   **Command**: `move <source> <destination>`
-*   **Description**: Moves or renames a file or directory.
-*   **Example**: `move notes.txt old_notes.txt`
-*   **Expected Output**:
-    *   `ok-Moved notes.txt to old_notes.txt.`
+*   **Move or Rename**:
+    *   Command: `move <source> <destination>`
+    *   Example: `move notes.txt old_notes.txt` (renames the file)
 
-#### Change Permissions
-*   **Command**: `chmod <path> <permissions>`
-*   **Description**: Changes the permissions of a file or directory (octal).
-*   **Example**: `chmod script.sh 0777`
-*   **Expected Output**:
-    *   `ok-Permissions for script.sh changed to 777.`
+*   **Change Permissions**:
+    *   Command: `chmod <path> <permissions>`
+    *   Example: `chmod script.sh 0777`
 
-### File I/O
+*   **Change Directory**:
+    *   Command: `cd <path>`
+    *   Example: `cd photos`
 
-#### Read File
-*   **Command**: `read [-offset=<num>] <path>`
-*   **Description**: Prints the content of a file to the screen. Option to start reading from an offset.
-*   **Example**: `read notes.txt` or `read -offset=10 notes.txt`
-*   **Expected Output**: The file contents are displayed.
+### Reading and Writing
 
-#### Write to File
-*   **Command**: `write [-offset=<num>] <path>`
-*   **Description**: writes text from standard input to a file. Overwrites by default unless offset is used. Terminates when you type `EOF`.
-*   **Example**: `write newfile.txt`
-*   **Expected Output**:
-    ```
-    ok-Waiting for data... (Type 'EOF' to finish)
-    <User types content>
-    EOF
-    ```
+*   **Read a file**:
+    *   Command: `read <filename>`
+    *   Want to start reading from the middle? Use `read -offset=10 <filename>`.
 
-### File Transfer (Upload/Download)
+*   **Write to a file**:
+    *   Command: `write <filename>`
+    *   Type your text, and when you're done, type `EOF` on a new line to save it.
 
-These commands support a `-b` flag for running in the background.
+### Uploading and Downloading
 
-#### Upload
-*   **Command**: `upload [-b] <local_path> <remote_path>`
-*   **Description**: Uploads a file from your local machine to the server.
-*   **Example**: `upload myimage.png images/myimage.png`
-*   **Expected Output**:
-    *   `Client: Uploading file myimage.png to server port 12345...`
-    *   `ok-Upload successful.`
+You can move files between your computer and the server. Both commands support a `-b` flag if you want them to run in the background while you do other things!
 
-#### Download
-*   **Command**: `download [-b] <client_path> <server_path>`
-*   **Description**: Downloads a file from the server to your local machine.
-*   **Example**: `download server_doc.txt local_doc.txt`
-*   **Expected Output**:
-    *   `Client: Downloading file local_doc.txt from server port 12345...`
-    *   `Download successful.`
+*   **Upload to Server**:
+    *   Command: `upload <local_file> <server_path>`
+    *   Example: `upload myphoto.jpg images/photo.jpg`
+    *   Background mode: `upload -b myphoto.jpg images/photo.jpg`
 
-### User-to-User File Transfer
+*   **Download from Server**:
+    *   Command: `download <server_file> <local_path>`
+    *   Example: `download report.pdf ~/Downloads/report.pdf`
+    *   Background mode: `download -b report.pdf ~/Downloads/report.pdf`
 
-These commands allow users to transfer files safely between their own directories.
+### Sharing with Friends (User-to-User)
 
-#### Transfer Request
-*   **Command**: `transfer_request <path> <dest_user>`
-*   **Description**: Initiates a request to send a file to another user.
-*   **Example**: `transfer_request shared_doc.txt bob`
-*   **Expected Output**:
-    *   `Transfer request sent successfully`
-    *   `Waiting for response... I'm blocking` (The client blocks until the receiver accepts or rejects)
+Want to send a file directly to another user on the system? We've got you covered.
 
-#### Accept Transfer
-*   **Command**: `accept <req_id> <destination_path>`
-*   **Description**: Accepts a pending transfer request.
-*   **Example**: `accept 1 received_doc.txt`
-*   **Expected Output**:
-    *   (On Sender's side): `Transfer request handled successfully`
+1.  **Send a Request**:
+    *   Command: `transfer_request <your_file> <username>`
+    *   Example: `transfer_request project.zip alice`
+    *   *Status*: You'll wait until they respond.
 
-#### Reject Transfer
-*   **Command**: `reject <req_id>`
-*   **Description**: Rejects a pending transfer request.
-*   **Example**: `reject 1`
-*   **Expected Output**:
-    *   (On Sender's side): `Transfer request rejected`
+2.  **Accept a Transfer** (If you are the receiver):
+    *   Command: `accept <request_id> <save_as_name>`
+    *   Example: `accept 1 project.zip`
 
-## 4. Server Console Commands
+3.  **Reject a Transfer**:
+    *   Command: `reject <request_id>`
+    *   Example: `reject 1`
 
-The server terminal accepts administrative commands via standard input:
+## 4. Server Administration
 
-*   **Command**: `create_user <username> <permissions>`
-    *   Creates a new OS user and home directory.
-*   **Command**: `exit`
-    *   Shuts down the server and cleans up child processes.
+If you are looking at the server terminal (where you ran `sudo ./server`), you have a few admin superpowers:
+
+*   **Create a new user**: `create_user <username> <permissions>`
+    *   This sets up a new system user and their home folder.
+*   **Shut it down**: `exit`
+    *   Stops the server and cleans everything up.
