@@ -1,109 +1,179 @@
-# Secure Client-Server File System
+# Secure File Sharing System
 
-This project implements a robust, multi-process client-server application in C designed for secure file management on Linux. It features privilege separation, process isolation, and a custom concurrency control mechanism.
+This document describes how to compile, run, and usage the Secure Client-Server File System project.
 
-## Features
+## 1. Compilation
 
-- **User Management**: Create and delete users with persistent storage.
-- **Secure File Operations**: Create, list, read, write, move, delete, and change permissions of files.
-- **File Transfer**: dedicated `upload` and `download` commands using separate ephemeral sockets for data transfer.
-- **Security**: 
-    - **Privilege Separation**: Server runs as root but drops privileges to specific users for operations.
-    - **Jail**: Uses `chroot` to restrict user access to their specific directories.
-    - **Group Consistency**: New users are assigned the administrator's group ID, avoiding creating files as `root`.
-- **Concurrency**: 
-    - Handles multiple clients simultaneously via `fork()`.
-    - Implements a Reader-Writer lock system using shared memory and semaphores to coordinate file access across processes.
-
-## Compilation
-
-The project uses a standard `Makefile`.
+To compile the project, use the provided `Makefile`. This will generate both the `server` and `client` executables.
 
 ```bash
-# Build the server and client
 make
+```
 
-# Clean build artifacts
+To clean build artifacts:
+```bash
 make clean
 ```
 
-## Usage
+The `Makefile` serves as the automation script for compiling the project.
+
+## 2. Startup Instructions
 
 ### Starting the Server
-The server requires root privileges to handle user switching and chrooting.
 
+The server must be started first. It requires **root privileges** to manage user permissions and creating jails (chroot). Note that all 3 arguments are mandatory.
+
+**Usage:**
 ```bash
-sudo ./server <root_directory> [ip] [port]
+sudo ./server <root_directory> <ip_address> <port>
 ```
-- `<root_directory>`: Base directory where all user data will be stored.
-- `[ip]`: Optional bind address (default: 127.0.0.1).
-- `[port]`: Optional port (default: 8080).
+
+**Example:**
+```bash
+# Create a storage directory
+mkdir -p /tmp/server_root
+
+# Start server on localhost port 8080
+sudo ./server /tmp/server_root 127.0.0.1 8080
+```
+
+*   `<root_directory>`: The absolute path to the directory where user files will be stored.
+*   `<ip_address>`: The IP address to bind to (e.g., `127.0.0.1`).
+*   `<port>`: The port number to listen on (e.g., `8080`).
+
+**Expected Output:**
+```
+Shared memory initialized for concurrency control.
+[PARENT] Server started on 127.0.0.1:8080
+```
 
 ### Starting the Client
-The client connects to the server to send commands.
 
+The client connects to the running server.
+
+**Usage:**
 ```bash
-./client [ip] [port]
+./client <ip_address> <port>
 ```
 
-## Commands
+**Example:**
+```bash
+./client 127.0.0.1 8080
+```
 
-Once connected, the following commands are available:
+**Expected Output:**
+```
+Connected to server at 127.0.0.1:8080
+>
+```
 
-### User Management
-- `create_user <username> <permissions>`: Create a new user (admin only).
-- `delete_user <username>`: Delete a user and their data (admin only).
-- `login <username>`: Login as a specific user.
+## 3. Implemented Commands
 
-### File Operations
-- `create <filename> <permissions>`: Create a file.
-- `create -d <dirname> <permissions>`: Create a directory.
-- `delete <path>`: Delete a file or directory.
-- `list [path]`: List contents of the current or specified directory.
-- `cd <path>`: Change directory.
-- `move <source> <dest>`: Move/Rename a file.
-- `chmod <path> <permissions>`: Change file permissions (octal, e.g., 755).
-- `read <path>`: Display file contents.
-- `write <path>`: Write data to a file (terminate with `EOF\n`).
+Once the client is connected, you can interact with the server. Note that you must `login` before performing file operations.
 
-### File Transfer
-- `upload [-b] <local_path> <remote_path>`: Upload a file to the server.
-    - `-b`: Run in background.
-    - *Note*: Uploaded files are automatically set to `777` permissions.
-- `download [-b] <remote_path> <local_path>`: Download a file from the server.
-    - `-b`: Run in background.
+### Authentication
 
-## Technical Implementation
+*   **Command**: `login <username>`
+*   **Description**: Logs in as an existing user.
+*   **Example**: `login user1`
+*   **Expected Output**:
+    *   Success: `> Welcome user1` (prompt updates)
+    *   Failure: `err-User unknown`
 
-This project relies heavily on Linux system programming concepts:
+### File Management
 
-### 1. Architecture & Process Management
-- **Forking Server**: The main server loop listens for connections and `fork()`s a new child process for each authenticated session (`src/server/server.c`, `src/server/child.c`).
-- **I/O Multiplexing**: Uses `select()` to handle non-blocking I/O between the socket and pipes (`src/server/server_main.c`).
-- **IPC**: Uses `pipe()` for communication between the parent server process (handling shared state/routing) and child session processes.
-- **Lifecycle**: Uses `prctl(PR_SET_PDEATHSIG, SIGKILL)` to ensure child processes terminate if the parent server crashes or exits.
+#### List Directory
+*   **Command**: `list [path]`
+*   **Description**: Lists the contents of the current directory or the specified path.
+*   **Example**: `list` or `list docs`
+*   **Expected Output**:
+    ```
+    file1.txt   Size: 123   Perms: 755
+    folder      Size: 4096  Perms: 755
+    ```
 
-### 2. Security & Isolation
-- **Chroot**: When a user logs in, the process calls `chroot()` to the user's home directory to prevent accessing the wider file system.
-- **Privilege Dropping**: Uses `setuid()` and `setgid()` to switch the process identity from root to the specific target user.
-- **Group Management**: Captures `SUDO_GID` at startup to ensure newly created users belong to the admin's group rather than root (`src/server/users.c`).
+#### Create File/Directory
+*   **Command**:
+    *   File: `create <filename> <permissions>`
+    *   Directory: `create -d <dirname> <permissions>`
+*   **Description**: Creates a new empty file or directory. Permissions are in octal (e.g., 0755).
+*   **Example**: `create notes.txt 0644` or `create -d photos 0755`
+*   **Expected Output**:
+    *   `ok-File notes.txt created successfully with permissions 644.`
+    *   `ok-Directory photos created successfully with permissions 755.`
 
-### 3. Concurrency Control
-- **Shared Memory**: Uses `mmap()` (`src/server/concurrency.c`) to create a shared memory region accessible by all forked processes.
-- **Synchronization**: Implements a **Reader-Writer lock** using POSIX semaphores (`sem_t`) in the shared memory region. This allows multiple concurrent readers but exclusive writers for file safety.
+#### Delete File/Directory
+*   **Command**: `delete <path>`
+*   **Description**: Deletes the file or directory at the specified path.
+*   **Example**: `delete notes.txt`
+*   **Expected Output**:
+    *   `ok-Deleted notes.txt.`
 
-### 4. Networking
-- **Protocol**: Custom text-based protocol over TCP.
-- **Data Transfer**: `upload` and `download` use a **secondary ephemeral socket**.
-    1.  Client requests transfer.
-    2.  Server opens a new socket on port 0 (OS assigns random free port).
-    3.  Server sends port number to client via control channel.
-    4.  Client connects to the new port for raw data streaming.
-    5.  Connection closes on completion.
+#### Change Directory
+*   **Command**: `cd <path>`
+*   **Description**: Changes the current working directory.
+*   **Example**: `cd photos`
+*   **Expected Output**:
+    *   `ok-Directory changed successfully.`
 
-## Project Structure
+#### Move/Rename
+*   **Command**: `move <source> <destination>`
+*   **Description**: Moves or renames a file or directory.
+*   **Example**: `move notes.txt old_notes.txt`
+*   **Expected Output**:
+    *   `ok-Moved notes.txt to old_notes.txt.`
 
-- `src/server/`: Server implementation (logic, users, ops, concurrency).
-- `src/client/`: Client implementation (UI, input handling).
-- `src/common/`: Shared utilities (networking, paths).
-- `include/`: Header files.
+#### Change Permissions
+*   **Command**: `chmod <path> <permissions>`
+*   **Description**: Changes the permissions of a file or directory (octal).
+*   **Example**: `chmod script.sh 0777`
+*   **Expected Output**:
+    *   `ok-Permissions for script.sh changed to 777.`
+
+### File I/O
+
+#### Read File
+*   **Command**: `read [-offset=<num>] <path>`
+*   **Description**: Prints the content of a file to the screen. Option to start reading from an offset.
+*   **Example**: `read notes.txt` or `read -offset=10 notes.txt`
+*   **Expected Output**: The file contents are displayed.
+
+#### Write to File
+*   **Command**: `write [-offset=<num>] <path>`
+*   **Description**: writes text from standard input to a file. Overwrites by default unless offset is used. Terminates when you type `EOF`.
+*   **Example**: `write newfile.txt`
+*   **Expected Output**:
+    ```
+    ok-Waiting for data... (Type 'EOF' to finish)
+    <User types content>
+    EOF
+    ```
+
+### File Transfer (Upload/Download)
+
+These commands support a `-b` flag for running in the background.
+
+#### Upload
+*   **Command**: `upload [-b] <local_path> <remote_path>`
+*   **Description**: Uploads a file from your local machine to the server.
+*   **Example**: `upload myimage.png images/myimage.png`
+*   **Expected Output**:
+    *   `Client: Uploading file myimage.png to server port 12345...`
+    *   `ok-Upload successful.`
+
+#### Download
+*   **Command**: `download [-b] <client_path> <server_path>`
+*   **Description**: Downloads a file from the server to your local machine.
+*   **Example**: `download server_doc.txt local_doc.txt`
+*   **Expected Output**:
+    *   `Client: Downloading file local_doc.txt from server port 12345...`
+    *   `Download successful.`
+
+## 4. Server Console Commands
+
+The server terminal accepts administrative commands via standard input:
+
+*   **Command**: `create_user <username> <permissions>`
+    *   Creates a new OS user and home directory.
+*   **Command**: `exit`
+    *   Shuts down the server and cleans up child processes.
