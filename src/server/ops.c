@@ -888,16 +888,16 @@ int op_accept(char *args[],int arg_count){
         send_string("err-Usage: accept <req_id> <dest_path>");
         return -1;
     }
-    int id = atoi(args[0]);
+    int id = atoi(args[1]);
     if(id < 0){
         send_string("err-Invalid request id");
         return -1;
     }
-    if(check_path_mine(args[1]) != 0){
+    if(check_path_mine(args[0]) != 0){
         send_string("err-Invalid path");
         return -1;
     }
-    resolve_path(current_dir_path, args[1], path);
+    resolve_path(current_dir_path, args[0], path);
     accept_req(id, path);
     return 0;
 }
