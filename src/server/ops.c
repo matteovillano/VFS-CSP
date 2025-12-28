@@ -199,6 +199,7 @@ int op_move(char *args[], int arg_count) {
 int op_upload(char *args[], int arg_count) {
     int background = 0;
     char *dest_path_str = NULL;
+    char *client_path_str = NULL;
     
     // Simple argument parsing for -b
     // Expected: upload <client_path> <server_path>
@@ -210,12 +211,14 @@ int op_upload(char *args[], int arg_count) {
             send_string("err-Usage: upload -b <client_path> <server_path>");
             return -1;
         }
+        client_path_str = args[1];
         dest_path_str = args[2];
     } else {
         if (arg_count < 2) {
             send_string("err-Usage: upload <client_path> <server_path>");
             return -1;
         }
+        client_path_str = args[0];
         dest_path_str = args[1];
     }
 
@@ -301,10 +304,6 @@ int op_upload(char *args[], int arg_count) {
     snprintf(msg, sizeof(msg), "ready-port-%d", port);
     send_string(msg);
     
-    // If background child, we can now close sockfd as we don't need control channel anymore
-    if (background) {
-        close(sockfd);
-    }
 
     // Accept connection
     int new_socket;
@@ -332,12 +331,14 @@ int op_upload(char *args[], int arg_count) {
 
     char buffer[BUFFER_SIZE];
     int n;
+    sleep(10);
     while ((n = recv(new_socket, buffer, BUFFER_SIZE, 0)) > 0) {
         if (write(fd, buffer, n) != n) {
             perror("write failed");
             break;
         }
     }
+
 
     if (fchmod(fd, 0777) == -1) {
         perror("fchmod failed");
@@ -351,13 +352,17 @@ int op_upload(char *args[], int arg_count) {
 
     if (!background) {
         send_string("ok-Upload successful.");
-        printf("[PID: %d] Upload finished: %s -> %s\n", getpid(), dest_path_str, resolved);
+        printf("[PID: %d] Upload finished: %s -> %s\n", getpid(), client_path_str, dest_path_str);
     } else {
         // Child doesn't need to send "ok" because parent already returned.
         // Client side parent also returned.
         // Client child is the one finishing.
         // So we just exit.
-        printf("[PID: %d] Background Upload finished: %s -> %s\n", getpid(), dest_path_str, resolved);
+        char msg[2048];
+        snprintf(msg, sizeof(msg), "[Background] Command: upload %s %s concluded\n", dest_path_str, client_path_str);
+        send_string(msg);
+        printf("[PID: %d] Background Upload finished: %s -> %s\n", getpid(), dest_path_str, client_path_str);
+        close(sockfd);
         exit(0);
     }
     return 0;
