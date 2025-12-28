@@ -25,6 +25,7 @@ void refresh_line() {
 }
 
 int handle_server_message() {
+    static int incomplete_line = 0;
     char recv_buffer[BUFFER_SIZE];
     memset(recv_buffer, 0, BUFFER_SIZE);
     int valread = read(sockfd, recv_buffer, BUFFER_SIZE - 1);
@@ -32,9 +33,20 @@ int handle_server_message() {
         return 0; // Server disconnected or error
 
     recv_buffer[valread] = '\0'; // Ensure null termination
-    printf("\r\033[K");
-    printf("Server: %s", recv_buffer);
-    refresh_line(); // Restores your partial typing!
+
+    if (!incomplete_line) {
+        printf("\r\033[K");
+        printf("Server: ");
+    }
+    printf("%s", recv_buffer);
+
+    if (valread > 0 && recv_buffer[valread - 1] == '\n') {
+        incomplete_line = 0;
+        refresh_line(); // Restores your partial typing!
+    } else {
+        incomplete_line = 1;
+        fflush(stdout);
+    }
     return 1;
 }
 

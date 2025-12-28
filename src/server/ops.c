@@ -582,9 +582,9 @@ int op_cd(char *args[], int arg_count) {
 int op_list(char *args[], int arg_count) {
     int dir_fd;
     if (arg_count == 0) {
-        dir_fd = dup(current_dir_fd);
+        dir_fd = openat(current_dir_fd, ".", O_RDONLY | O_DIRECTORY);
         if (dir_fd == -1) {
-            perror("dup failed");
+            perror("openat failed");
             send_string("err-Error listing directory");
             return -1;
         }
