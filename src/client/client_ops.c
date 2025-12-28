@@ -129,7 +129,7 @@ int op_download(char *command) {
     
 
 
-    printf("Downloading file to %s from server port %d...\n", local_path, port);
+    printf("Client:Downloading file to %s from server port %d...\n", local_path, port);
     
     // Transfer data
     char file_buf[BUFFER_SIZE];
