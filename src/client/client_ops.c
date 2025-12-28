@@ -255,7 +255,7 @@ int op_upload(char *command) {
         return -1;
     }
     
-    printf("Uploading file %s to server port %d...\n", local_path, port);
+    printf("Client: Uploading file %s to server port %d...\n", local_path, port);
     
     // Transfer data
     char file_buf[BUFFER_SIZE];
