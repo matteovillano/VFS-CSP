@@ -1,9 +1,10 @@
 #include "common.h"
 
-
-
+/*
+ * Creates a server socket and binds it to the specified port.
+ * Returns the socket file descriptor on success, -1 on failure.
+ */
 int create_server_socket(int port) {
-
     struct sockaddr_in server_addr;
     int opt = 1;
     int sockfd;
@@ -43,7 +44,10 @@ int create_server_socket(int port) {
     return sockfd;
 }
 
-
+/*
+ * Creates a client socket and connects to the specified server.
+ * Returns the socket file descriptor on success, -1 on failure.
+ */
 int create_client_socket(const char *ip, int port) {
     int sockfd;
     struct sockaddr_in server_addr;

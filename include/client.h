@@ -10,5 +10,4 @@ int op_command(char *command);
 int op_download(char *command);
 int op_upload(char *command);
 
-
 #endif

@@ -4,35 +4,29 @@
 #include "transfer.h"
 #include <signal.h>
 
-int sockfd;
 extern ClientSession sessions[MAX_CLIENTS];
+int sockfd;
 int pipe_read;
 int pipe_write;
 
-
 /*
- * handle_client
- * -------------
  * Manages a new client connection.
  * 1. Accepts the connection.
  * 2. Finds a free session slot.
- * 3. Creates pipes for Parent<->Child IPC.
+ * 3. Creates pipes for Parent<->Child.
  * 4. Forks a child process to handle the session.
  * 5. Parent tracks the child pid/pipes.
  */
 int handle_client(int server_socket) {
+    // Accept connection
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
     int client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_len);
-
     if (client_socket < 0) {
         perror("Accept failed");
         return -1;
     }
-
-    // Log connection in parent only usually, but this is handled in child code after fork? 
-    // Wait, handle_client is called by parent, THEN forks.
-    // So this print executes in PARENT.
+    
     printf("[PARENT] New connection from %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
     // Find free slot
@@ -43,26 +37,25 @@ int handle_client(int server_socket) {
             break;
         }
     }
-
     if (slot == -1) {
         printf("Max clients reached, connection rejected (for now)\n");
         close(client_socket);
         return -1;
     }
 
-    //ClientSession *session = &sessions[slot];
-
+    // Create pipes
     int p_to_c[2]; // Parent to Child
     int c_to_p[2]; // Child to Parent
-
     if (pipe(p_to_c) == -1 || pipe(c_to_p) == -1) {
         perror("pipe");
         close(client_socket);
         return -1;
     }
 
+    // Fork child process
     pid_t pid = fork();
     if (pid < 0) {
+        // Fork failed
         perror("Fork failed");
         close(client_socket);
         close(p_to_c[0]); 
@@ -74,6 +67,7 @@ int handle_client(int server_socket) {
         // Child process
         close(server_socket); // Close listening socket
 
+        // Setup signal handlers to default behavior
         signal(SIGINT, SIG_DFL);
         signal(SIGTERM, SIG_DFL);
 
@@ -81,6 +75,7 @@ int handle_client(int server_socket) {
         close(p_to_c[1]); // Close write end of parent-to-child
         close(c_to_p[0]); // Close read end of child-to-parent
         
+        // Setup pipe file descriptors
         pipe_read = p_to_c[0];
         pipe_write = c_to_p[1];
 
@@ -90,10 +85,6 @@ int handle_client(int server_socket) {
             _exit(0); 
         }
 
-        // We might still need client_socket to communicate with the actual client (TCP)
-        // For now, the prompt says "generate a child process it also create 2 pipes to allow interprocess comunication"
-        // It implies the child handles the client (socket) AND talks to parent (pipe).
-        // Using global sockfd as per previous code, but updating to use local or passed var is better.
         sockfd = client_socket; 
         
         retrive_users();
@@ -112,16 +103,11 @@ int handle_client(int server_socket) {
         sessions[slot].pipe_fd_write = p_to_c[1]; // Write to child
         printf("[PARENT] added session %d with pid %d and pipe fd %d %d\n", slot, pid, c_to_p[0], p_to_c[1]);
 
-
         return 0; // Success
     }
 }
 
-
-
 /*
- * handle_user
- * -----------
  * Main loop for the child process.
  * Uses select() to monitor:
  * 1. Client socket (User commands)
@@ -129,33 +115,28 @@ int handle_client(int server_socket) {
  */
 int handle_user(){
     char buffer[BUFFER_SIZE];
-    int n;
-    
-
-
-    // Removed "Handling client" debug
-    // printf("Handling client (PID: %d)\n", getpid());
-
-    fd_set readfds;
-    int max_fd;
+    int n; // Number of bytes read
+    fd_set readfds; // File descriptors for select
+    int max_fd; // Maximum file descriptor for select
     
     while (1) {
-        
-
+        // Setup file descriptors for select
         FD_ZERO(&readfds);
         FD_SET(sockfd, &readfds);
-        FD_SET(pipe_read, &readfds);
+        // FD_SET(pipe_read, &readfds);
 
         max_fd = sockfd;
-        if (pipe_read > max_fd)
-            max_fd = pipe_read;
+        // if (pipe_read > max_fd)
+        //     max_fd = pipe_read;
 
+        // Wait for data
         if (select(max_fd + 1, &readfds, NULL, NULL, NULL) < 0){
             if (errno == EINTR) continue;
             perror("select");
             exit(EXIT_FAILURE);
         }
 
+        // Check for data on TCP socket
         if (FD_ISSET(sockfd, &readfds)) {
             memset(buffer, 0, sizeof(buffer));
             // Read from TCP socket (from user)
@@ -174,32 +155,25 @@ int handle_user(){
         
             execute_command(buffer);
         }
-
-        
     }
     close(sockfd);
-    close(pipe_read);
-    close(pipe_write);
+    // close(pipe_read);
+    // close(pipe_write);
     return 0;
 }
 
 /*
- * execute_command
- * ---------------
  * Parses and executes user commands received over the socket.
- * Dispatches to op_* functions or handles internal logic (login/create_user).
  */
 int execute_command(char *command) {
-   
     char *args[3];
 
-    
-    if (strcmp(command, "exit") == 0) {
+    // if exit command, exit
+    if (strncmp(command, "exit", 4) == 0) {
         exit(0);
     }
     
-
-    // Tokenize input, args[0] = command, args[1] = username, args[2] = permission
+    // Tokenize input
     int arg_count = 0;
     char *token = strtok(command, " ");
     while (token != NULL) {
@@ -208,15 +182,9 @@ int execute_command(char *command) {
         token = strtok(NULL, " ");
     }
 
-    // if there are too many arguments, skip
-    if (token != NULL) {
-        send_string("err-invalid command\n");
-        return 0;
-    }
-/*
+    /* it is not specified in the assignment but it can be a valid command
     if (arg_count == 3) {
         if (strcmp(args[0], "create_user") == 0) {
-            // TODO create user
             if (check_permissions(args[2]) < 0) {
                 send_string("err-invalid permissions\n");
             } else {
@@ -231,11 +199,11 @@ int execute_command(char *command) {
         } else {
             send_string("err-invalid command\n");
         }
-    } else*/
+    } else
+    */
     if (arg_count == 2) {
-        /* it is not specified in the assignment but it is a valid command */
+        /* it is not specified in the assignment but it can be a valid command */
         /*if (strcmp(args[0], "delete") == 0) {
-            // TODO delete user
             int ret = delete_user(args[1]);
             if (ret == -1) {
                 send_string("err-user not deleted\n");
@@ -243,11 +211,9 @@ int execute_command(char *command) {
                 send_string("user deleted\n");
             }
         } else*/
-        if (strcmp(args[0], "login") == 0) {
-            // TODO login
+        if (strcmp(args[0], "login") == 0) { // login
             retrive_users();
-            if (!user_exists(args[1])) {
-                
+            if (!user_exists(args[1])) { // check if user exists
                 login(args[1]);
             }else{
                 send_string("err-user does not exist\n");

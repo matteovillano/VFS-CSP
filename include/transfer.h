@@ -5,7 +5,6 @@
 #include "common.h"
 #include "users.h"
 
-
 #define PATH_LENGTH 1024
 
 extern int pipe_read;
@@ -48,14 +47,11 @@ typedef struct dict{
     struct dict *next;
 } dict;
 
-
 int create_request(char *sender, char *receiver, char *path);
 int accept_req(int id, char *dest);
 int reject_req(int id);
 int i_am_user();
 int child_handle_msg();
 int parent_handle_msg(int i);
-
-
 
 #endif

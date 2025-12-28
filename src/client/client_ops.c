@@ -1,15 +1,16 @@
 #include "common.h"
 #include "client.h"
 
-
 extern char server_ip[];
 extern int sockfd;
 extern char input_buffer[];
 extern int input_len;
 
+/*
+ * Handles client commands: download, upload, exit
+ */
 int op_command(char *command) {
     
-    //printf("I execute the command: %s\n", command);
     if (strncmp(command, "download ",9)==0){
         op_download(command);
         return -1;
@@ -23,31 +24,26 @@ int op_command(char *command) {
         exit(0);
     }
     
-    
     return 0;
     
 }   
 
-
-
 /*
- * op_download
- * -----------
- * Handles file download from the server.
+ * download file from the server.
  * Supports background execution via -b using fork().
  * Protocol:
- * 1. Sends command to server.
- * 2. Waits for "ready-port-<port>" message (Synchronous).
- * 3. Forks if -b is set.
- * 4. Connects to data port and receives file content.
+ * - Sends command to server.
+ * - Waits for "ready-port-<port>" message
+ * - Forks if -b is set.
+ * - Connects to data port and receives file content.
  */
 int op_download(char *command) {
-    
     
     char cmd_copy[BUFFER_SIZE];
     strncpy(cmd_copy, command, BUFFER_SIZE);
     cmd_copy[BUFFER_SIZE - 1] = '\0';
     
+    // Parse command line arguments
     char *args[10];
     int arg_count = 0;
     char *token = strtok(cmd_copy, " \n");
@@ -56,17 +52,16 @@ int op_download(char *command) {
         token = strtok(NULL, " \n");
     }
     
-    int background = 0;
+    int background = 0; // background variable
     char *server_path = NULL;
     char *client_path = NULL;
 
     // Check for -b flag
-    // Format: download -b <remote> <local> OR download <remote> <local>
     if (arg_count >= 2 && strcmp(args[1], "-b") == 0) {
         background = 1;
         if (arg_count < 4) {
-             printf("Usage: download -b <server_path> <client_path>\n");
-             return -1;
+            printf("Usage: download -b <server_path> <client_path>\n");
+            return -1;
         }
         server_path = args[2];
         client_path = args[3];
@@ -78,10 +73,10 @@ int op_download(char *command) {
         server_path = args[1];
         client_path = args[2];
     }
-    
 
     char *local_path = client_path;
 
+    // Open local file for writing
     int fd = open(local_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd == -1) {
         perror("open failed");
@@ -101,22 +96,23 @@ int op_download(char *command) {
     buffer[n] = '\0';
     
     if (strncmp(buffer, "ready-port-", 11) != 0) {
-        printf("Server: %s\n", buffer); // Print error if any
+        printf("Server: %s\n", buffer);
         return -1;
     }
     
     int port = atoi(buffer + 11);
     
+    // Fork if background
     if (background) {
         pid_t pid = fork();
         if (pid < 0) {
             perror("fork failed");
             return -1;
         } else if (pid > 0) {
-            // Parent: return immediately
+            // Parent
             return 0;
         }
-        // Child continues
+        // Child continues below
     }
 
     // Connect to data port
@@ -126,10 +122,8 @@ int op_download(char *command) {
         if (background) exit(1);
         return -1;
     }
-    
 
-
-    printf("Client:Downloading file to %s from server port %d...\n", local_path, port);
+    printf("Client: Downloading file to %s from server port %d...\n", local_path, port);
     
     // Transfer data
     char file_buf[BUFFER_SIZE];
@@ -156,21 +150,20 @@ int op_download(char *command) {
 
 
 /*
- * op_upload
- * ---------
- * Handles file upload to the server.
+ * upload file to the server.
  * Supports background execution via -b using fork().
  * Protocol:
- * 1. Checks local file existence.
- * 2. Waits for "ready-port-<port>" message (Synchronous).
- * 3. Forks if -b is set.
- * 4. Connects to data port and sends file content.
+ * - Checks local file existence.
+ * - Waits for "ready-port-<port>" message.
+ * - Forks if -b is set.
+ * - Connects to data port and sends file content.
  */
 int op_upload(char *command) {
     char cmd_copy[BUFFER_SIZE];
     strncpy(cmd_copy, command, BUFFER_SIZE);
     cmd_copy[BUFFER_SIZE - 1] = '\0';
     
+    // Parse command line arguments
     char *args[10];
     int arg_count = 0;
     char *token = strtok(cmd_copy, " \n");
@@ -181,27 +174,24 @@ int op_upload(char *command) {
     
     int background = 0;
     char *local_path = NULL;
-    //char *remote_path = NULL;
 
     // Check for -b flag
-    // Format: upload -b <local> <remote> OR upload <local> <remote>
     if (arg_count >= 2 && strcmp(args[1], "-b") == 0) {
         background = 1;
         if (arg_count < 4) {
-             printf("Usage: upload -b <local_path> <remote_path>\n");
-             return -1;
+            printf("Usage: upload -b <local_path> <remote_path>\n");
+            return -1;
         }
         local_path = args[2];
-        //remote_path = args[3];
     } else {
         if (arg_count < 3) {
             printf("Usage: upload <local_path> <remote_path>\n");
             return -1;
         }
         local_path = args[1];
-        //remote_path = args[2];
     }
     
+    // Open local file for reading
     int fd = open(local_path, O_RDONLY);
     if (fd == -1) {
         printf("Error: Cannot open local file %s\n", local_path);
@@ -212,9 +202,6 @@ int op_upload(char *command) {
 
     // Wait for server to send port
     char buffer[BUFFER_SIZE];
-    // This recv blocks until server sends port or error.
-    // Even in background mode, we wait for port synchronously before forking, 
-    // to ensure server is ready and we have the destination port.
     int n = recv(sockfd, buffer, BUFFER_SIZE - 1, 0);
     if (n <= 0) {
         printf("Error: Server disconnected or error receiving port\n");
@@ -224,7 +211,7 @@ int op_upload(char *command) {
     buffer[n] = '\0';
     
     if (strncmp(buffer, "ready-port-", 11) != 0) {
-        printf("Server: %s\n", buffer); // Print error if any
+        printf("Server: %s\n", buffer);
         close(fd);
         return -1;
     }
@@ -238,12 +225,11 @@ int op_upload(char *command) {
             close(fd);
             return -1;
         } else if (pid > 0) {
-            // Parent: return immediately so user can type commands
-            close(fd); // Parent doesn't need file
+            // Parent
+            close(fd);
             return 0;
         }
         // Child continues
-        // Child doesn't need input keys or main socket interaction
     }
 
     // Connect to data port
@@ -265,18 +251,11 @@ int op_upload(char *command) {
             break;
         }
     }
-
     
     close(fd);
     close(data_sock);
     
     if (background) {
-        //printf("[Background] Command: upload %s %s concluded\n", local_path, remote_path);
-        // Refresh prompt if we printed to stdout asynchronously?
-        // User might be typing. 
-        // Ideally we shouldn't mess with prompt, but requirement is just to notify.
-        // We'll just print.
-        
         exit(0);
     }
     

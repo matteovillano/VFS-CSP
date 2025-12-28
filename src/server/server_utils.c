@@ -6,6 +6,9 @@ extern char current_dir_path[];
 extern char username[];
 extern ClientSession sessions[];
 
+/*
+ * Kills all child processes and exits the server.
+ */
 void cleanup_children(int sig) {
     (void)sig; // unused
     restore_privileges(); // Regain root to kill any user's process
@@ -21,8 +24,11 @@ void cleanup_children(int sig) {
     exit(0);
 }
 
+/*
+ * Handles SIGCHLD signal by reaping dead children.
+ */
 void handle_sigchld(int sig) {
-    (void)sig;
+    (void)sig; // unused
     int status;
     pid_t pid;
 
@@ -45,42 +51,30 @@ void handle_sigchld(int sig) {
 }
 
 /*
- * find_path
- * ---------
  * Resolves the path of a given file descriptor using /proc/self/fd.
- * Useful for debugging or recovering the path of an open directory.
  */
 int find_path(char* dest, int dest_size, int fd){
     char proc_path[64];
     ssize_t len;
 
-    // 1. Construct the path to the symbolic link in /proc
-    // /proc/self/fd/N refers to the Nth file descriptor of the current process
+    // Construct the path to the symbolic link: /proc/self/fd/N where N is fd
     snprintf(proc_path, sizeof(proc_path), "/proc/self/fd/%d", fd);
 
-    // 2. Read the symbolic link
-    // readlink does NOT null-terminate the string, so we must handle it.
+    // Read the symbolic link
     len = readlink(proc_path, dest, dest_size - 1);
-
     if (len == -1) {
         perror("readlink failed");
         return -1;
     }
-
-    // 3. Null-terminate the string
     dest[len] = '\0';
+
     printf("Resolved path: %s\n", dest);
     return 0;
 }
 
 
-// Helper to canonicalize path lexically
 /*
- * resolve_path
- * ------------
  * Lexically resolves a path against a base directory.
- * Handles '.' and '..' components to create a canonical absolute path.
- * DOES NOT access the filesystem (pure lexical analysis).
  */
 int resolve_path(char *base, char *path, char *resolved) {
     char temp[2048];
@@ -118,7 +112,7 @@ int resolve_path(char *base, char *path, char *resolved) {
     // Reconstruct
     resolved[0] = '\0';
     if (token_count == 0) {
-         strcat(resolved, "/");
+        strcat(resolved, "/");
     } else {
         for (int i = 0; i < token_count; i++) {
             strcat(resolved, "/");
@@ -128,6 +122,10 @@ int resolve_path(char *base, char *path, char *resolved) {
     return 0;
 }
 
+/*
+ * Checks if a path is valid.
+ * Returns 0 if the path is valid, -1 otherwise.
+ */
 int check_path(char *path) {
     char resolved[2048];
 
@@ -137,13 +135,11 @@ int check_path(char *path) {
     
     // Resolve current_dir_path + path
     resolve_path(current_dir_path, path, resolved);
-    
-    //printf("Checking path: %s -> %s (Root: %s)\n", path, resolved, root_dir_path);
 
     // Check if resolved path starts with root_dir_path
     size_t root_len = strlen(root_dir_path);
     if (strncmp(resolved, root_dir_path, root_len) == 0) {
-        // Ensure it's an exact match or a subdirectory (prevent /root vs /root_sibling)
+        // Ensure it's an exact match or a subdirectory
         if (resolved[root_len] == '\0' || resolved[root_len] == '/') {
             return 0;
         }
@@ -153,11 +149,8 @@ int check_path(char *path) {
  }
 
 /*
- * check_path_mine
- * ---------------
- * Security Check: Verifies that the requested path falls within the 
- * logged-in user's dedicated directory.
- * Prevents users from accessing other users' files or system files.
+ * Verifies that the requested path falls within the logged-in user's dedicated directory.
+ * Returns 0 if the path is valid, -1 otherwise.
  */
 int check_path_mine(char *path){
     char my_path[2048];
@@ -170,13 +163,11 @@ int check_path_mine(char *path){
     
     // Resolve current_dir_path + path
     resolve_path(current_dir_path, path, resolved);
-    
-    //printf("Checking path: %s -> %s (Root: %s)\n", path, resolved, root_dir_path);
 
     // Check if resolved path starts with root_dir_path
     size_t my_len = strlen(my_path);
     if (strncmp(resolved, my_path, my_len) == 0) {
-        // Ensure it's an exact match or a subdirectory (prevent /root vs /root_sibling)
+        // Ensure it's an exact match or a subdirectory
         if (resolved[my_len] == '\0' || resolved[my_len] == '/') {
             return 0;
         }

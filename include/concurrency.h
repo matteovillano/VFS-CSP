@@ -35,4 +35,4 @@ void reader_unlock(FileLock* lock);
 void writer_lock(FileLock* lock);
 void writer_unlock(FileLock* lock);
 
-#endif // CONCURRENCY_H
+#endif

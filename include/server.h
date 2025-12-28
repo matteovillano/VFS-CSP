@@ -32,5 +32,4 @@ int resolve_path(char *base, char *path, char *resolved);
 void cleanup_children(int sig);
 void handle_sigchld(int sig);
 
-
 #endif

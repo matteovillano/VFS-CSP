@@ -5,6 +5,9 @@
 
 extern int sockfd;
 extern int current_dir_fd;
+static uid_t real_uid = 0;
+static gid_t real_gid = 0;
+static int privileges_initialized = 0;
 
 int check_permissions(char *perm_str) {
     if (perm_str == NULL || strlen(perm_str) != 3) {
@@ -18,9 +21,14 @@ int check_permissions(char *perm_str) {
     return 0;
 }
 
+/*
+ * Opens the root directory specified by the user.
+ * If the directory does not exist, it creates it with 0777 permissions.
+ * Returns the file descriptor of the opened directory.
+ */
 int open_root_dir(char *root_dir) {
     struct stat st = {0};
-    mode_t old_umask = umask(0);
+    mode_t old_umask = umask(0); // set the eventual mask to 0
     if (stat(root_dir, &st) == -1) {
         if (mkdir(root_dir, 0777) == -1) {
             perror("mkdir");
@@ -34,10 +42,14 @@ int open_root_dir(char *root_dir) {
         perror("open");
         exit(EXIT_FAILURE);
     }
-    umask(old_umask);
+    umask(old_umask); // restore the mask
     return fd;
 }
 
+/*
+ * Sends a string to the server.
+ * If the string does not end with a newline, it appends one.
+ */
 int send_string(char *str){
     size_t len = strlen(str);
     size_t sent = 0;
@@ -55,14 +67,7 @@ int send_string(char *str){
     return 0;
 }
 
-
-static uid_t real_uid = 0;
-static gid_t real_gid = 0;
-static int privileges_initialized = 0;
-
 /*
- * init_privileges
- * ---------------
  * Captures the original SUDO_UID and SUDO_GID from environment variables.
  * Allows the server to drop privileges to the original user and restore them when needed.
  */
@@ -81,10 +86,7 @@ void init_privileges() {
 }
 
 /*
- * minimize_privileges
- * -------------------
  * Drops effective user ID to the non-root SUDO user.
- * Used for most server operations to enhance security.
  */
 void minimize_privileges() {
     if (!privileges_initialized) return;
@@ -95,10 +97,7 @@ void minimize_privileges() {
 }
 
 /*
- * restore_privileges
- * ------------------
  * Elevates effective user ID back to root (0).
- * Used for critical operations like creating users or modifying protected files.
  */
 void restore_privileges() {
     if (!privileges_initialized) return;
@@ -108,10 +107,16 @@ void restore_privileges() {
     }
 }
 
+/*
+ * Returns the original SUDO_UID.
+ */
 uid_t get_real_uid() {
     return real_uid;
 }
 
+/*
+ * Returns the original SUDO_GID.
+ */
 gid_t get_real_gid() {
     return real_gid;
 }

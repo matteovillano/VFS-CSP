@@ -3,8 +3,6 @@
 static SharedState *shared_state = NULL;
 
 /*
- * init_shared_memory
- * ------------------
  * Initializes shared memory segment using mmap and sets up
  * global and per-file semaphores for concurrency control.
  */
@@ -40,8 +38,6 @@ void init_shared_memory() {
 }
 
 /*
- * get_file_lock
- * -------------
  * Retrieves or creates a FileLock structure for a given path.
  * Uses a global semaphore to ensure thread-safe access to the lock array.
  */
@@ -53,7 +49,7 @@ FileLock* get_file_lock(const char* path) {
 
     sem_wait(&shared_state->global_lock);
 
-    // 1. Check if lock already exists for this path
+    // Check if lock already exists for this path
     for (int i = 0; i < MAX_LOCKS; i++) {
         if (shared_state->locks[i].usage_count > 0 && 
             strncmp(shared_state->locks[i].filepath, path, PATH_MAX) == 0) {
@@ -63,7 +59,7 @@ FileLock* get_file_lock(const char* path) {
         }
     }
 
-    // 2. Find a free slot
+    // Find a free slot
     for (int i = 0; i < MAX_LOCKS; i++) {
         if (shared_state->locks[i].usage_count == 0) {
             strncpy(shared_state->locks[i].filepath, path, PATH_MAX - 1);
@@ -71,7 +67,7 @@ FileLock* get_file_lock(const char* path) {
             shared_state->locks[i].usage_count = 1;
             shared_state->locks[i].readers_count = 0;
             
-            // Reset semaphores just in case (though they should be clean)
+            // Reset semaphores
             sem_destroy(&shared_state->locks[i].mutex);
             sem_destroy(&shared_state->locks[i].write_sem);
             sem_init(&shared_state->locks[i].mutex, 1, 1);
@@ -87,6 +83,10 @@ FileLock* get_file_lock(const char* path) {
     return NULL;
 }
 
+/*
+ * Releases a file lock.
+ * Decreases the usage count and clears the path if the last user releases the lock.
+ */
 void release_file_lock(FileLock* lock) {
     if (lock == NULL || shared_state == NULL) return;
 
@@ -95,7 +95,6 @@ void release_file_lock(FileLock* lock) {
     if (lock->usage_count > 0) {
         lock->usage_count--;
         if (lock->usage_count == 0) {
-            // Slot is now free, clear path
             memset(lock->filepath, 0, PATH_MAX);
         }
     }
@@ -104,8 +103,6 @@ void release_file_lock(FileLock* lock) {
 }
 
 /*
- * reader_lock
- * -----------
  * Acquires a read lock. Multiple readers can hold the lock simultaneously,
  * but the first reader blocks any writers.
  */
@@ -126,6 +123,10 @@ void reader_lock(FileLock* lock) {
     sem_post(&lock->mutex);
 }
 
+/*
+ * Releases a read lock.
+ * Decreases the reader count and releases the write semaphore if no readers remain.
+ */
 void reader_unlock(FileLock* lock) {
     if (lock == NULL) return;
 
@@ -138,9 +139,7 @@ void reader_unlock(FileLock* lock) {
 }
 
 /*
- * writer_lock
- * -----------
- * Acquires a write lock. Exclusive access; blocks all other readers and writers.
+ * Acquires a write lock. Blocks all other readers and writers.
  */
 void writer_lock(FileLock* lock) {
     if (lock == NULL) return;
@@ -154,6 +153,10 @@ void writer_lock(FileLock* lock) {
     sem_wait(&lock->write_sem);
 }
 
+/*
+ * Releases a write lock.
+ * Unblocks all readers and writers.
+ */
 void writer_unlock(FileLock* lock) {
     if (lock == NULL) return;
     sem_post(&lock->write_sem);

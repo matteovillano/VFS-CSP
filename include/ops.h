@@ -19,7 +19,4 @@ int op_transfer_request(char *args[], int arg_count);
 int op_accept(char *args[], int arg_count);
 int op_reject(char *args[], int arg_count);
 
-
-
-
 #endif

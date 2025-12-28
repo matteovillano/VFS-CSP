@@ -20,17 +20,17 @@ typedef struct {
     int permissions;
 } User;
 
-int create_user(char *username, int permissions);
-int delete_user(char *username);
+void save_users_to_file();
+int user_exists(char *username);
 int create_user_persistance(char *username, int permissions);
 int delete_user_persistance(char *username);
 void retrive_users();
-void save_users_to_file();
 int create_user_folder(char *username, int permissions);
+int remove_directory_recursive(int parent_fd, char *name);
 int delete_user_folder(char *username);
 int create_os_user(char *username);
 int delete_os_user(char *username);
-int user_exists(char *username);
-
+int create_user(char *username, int permissions);
+//int delete_user(char *username);
 
 #endif

@@ -1,30 +1,25 @@
 #include "common.h"
 #include "client.h"
 
-
 int sockfd = -1;
 char server_ip[INET_ADDRSTRLEN];
 int server_port;
 
-
-
-
 int main(int argc, char *argv[]) {
-    /*
+    /* parameters are mandatory
     strncpy(server_ip, DEFAULT_IP, INET_ADDRSTRLEN);
     server_port = DEFAULT_PORT;
     */
 
+    // check arguments errors
     if(argc != 3) {
         fprintf(stderr, "Usage: %s <ip> <port>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
-
     if (argc > 3) {
         fprintf(stderr, "Too many arguments\n");
         exit(EXIT_FAILURE);
     }
-
     if (argc >= 2)
         strncpy(server_ip, argv[1], INET_ADDRSTRLEN);
     if (argc >= 3)
@@ -38,12 +33,18 @@ int main(int argc, char *argv[]) {
     printf("Connected to server at %s:%d\n", server_ip, server_port);
 
     enableRawMode();
+
     fd_set read_fds;
     int max_fd;
 
     refresh_line();
 
+    /*
+     * main Client loop:
+     * wait for server message or user input
+    */
     while(1){
+        // Clear and set file descriptors
         FD_ZERO(&read_fds);
         FD_SET(sockfd, &read_fds);
         FD_SET(STDIN_FILENO, &read_fds);
@@ -58,17 +59,18 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
 
+        // handle server message
         if (FD_ISSET(sockfd, &read_fds)) {
             if (handle_server_message() == 0) {
                 printf("\nServer disconnected.\n");
                 break;
             }
         }
+
+        // handle user input
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
             handle_user_input();
         }
-            
-
 
     }
 

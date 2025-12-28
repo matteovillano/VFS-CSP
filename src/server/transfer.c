@@ -5,9 +5,13 @@
 #include <fcntl.h>
 #include <pwd.h>
 
-
 dict *dict_head = NULL;
+req_list *req_list_head = NULL;
+int req_counter = 0;
 
+/*
+ * Appends a key-value pair to the dictionary. 
+ */
 int append_dict(int key, int value){
     dict *new_dict = malloc(sizeof(dict));
     new_dict->key = key;
@@ -17,6 +21,9 @@ int append_dict(int key, int value){
     return 0;
 }
 
+/*
+ * Removes a key-value pair from the dictionary.
+ */
 int pop_dict(int key, int *value){
     dict *curr = dict_head;
     dict *prev = NULL;
@@ -37,9 +44,10 @@ int pop_dict(int key, int *value){
     }
     return -1;
 }
-req_list *req_list_head = NULL;
-int req_counter = 0;
 
+/*
+ * Appends a transfer request to the list.
+ */
 int append_req(transfer_request req){
     req_list *new_req = malloc(sizeof(req_list));
     memcpy(&new_req->req, &req, sizeof(transfer_request));
@@ -48,6 +56,9 @@ int append_req(transfer_request req){
     return 0;
 }
 
+/*
+ * Removes a transfer request from the list by username.
+ */
 int pop_req_username(char *usern, transfer_request *req) {
     req_list *curr = req_list_head;
     req_list *prev = NULL;
@@ -69,6 +80,9 @@ int pop_req_username(char *usern, transfer_request *req) {
     return -1;
 }
 
+/*
+ * Removes a transfer request from the list by ID.
+ */
 int pop_req_id(int id, transfer_request *req) {
     req_list *curr = req_list_head;
     req_list *prev = NULL;
@@ -90,10 +104,9 @@ int pop_req_id(int id, transfer_request *req) {
     return -1;
 }
 
-
-
-
-// Helper function to write exactly 'n' bytes
+/*
+ * write exactly 'n' bytes.
+ */
 int write_n(int fd, void *vptr, size_t n) {
     size_t nleft;
     ssize_t nwritten;
@@ -105,9 +118,9 @@ int write_n(int fd, void *vptr, size_t n) {
         if ((nwritten = write(fd, ptr, nleft)) <= 0) {
             if(nwritten <= 0) perror("write");
             if (nwritten < 0 && errno == EINTR)
-                nwritten = 0;   /* and call write() again */
+                nwritten = 0;
             else
-                return -1;      /* error */
+                return -1;
         }
         nleft -= nwritten;
         ptr += nwritten;
@@ -115,8 +128,7 @@ int write_n(int fd, void *vptr, size_t n) {
     return 0;
 }
 
-// Helper function to read exactly 'n' bytes
-// Returns 0 on success (read n bytes), -1 on error, or number of bytes read if EOF occurred prematurely
+// read exactly 'n' bytes
 int read_n(int fd, void *vptr, size_t n) {
     size_t nleft;
     ssize_t nread;
@@ -127,34 +139,41 @@ int read_n(int fd, void *vptr, size_t n) {
     while (nleft > 0) {
         if ((nread = read(fd, ptr, nleft)) < 0) {
             if (errno == EINTR)
-                nread = 0;      /* and call read() again */
+                nread = 0;
             else
                 return -1;
         } else if (nread == 0) {
-            break;              /* EOF */
+            break;
         }
         nleft -= nread;
         ptr += nread;
     }
-    return (n - nleft);         /* return >= 0 */
+    return (n - nleft);
 }
 
-
+/*
+ * send a transfer message.
+ */
 int send_transfer_msg(int fd, transfer_msg *msg){
     return write_n(fd, msg, sizeof(transfer_msg));
 }
 
+/*
+ * receive a transfer message.
+ */
 int receive_transfer_msg(int fd, transfer_msg *msg){
     int n = read_n(fd, msg, sizeof(transfer_msg));
     if (n < 0) return -1;
     if (n == 0) return 0; // EOF
-    if ((size_t)n < sizeof(transfer_msg)) return -1; // Partial read treated as error for now
+    if ((size_t)n < sizeof(transfer_msg)) return -1; // Partial read treated as error
     return n;
 }
 
-
-
-//child operations
+/*
+ * create a transfer request.
+ * Initializes a transfer_msg with the status NEW_REQ, sends it via pipe_write,
+ * and blocks until a response is received via pipe_read.
+ */
 int create_request(char *sender, char *path, char *receiver){
     transfer_msg msg;
     memset(&msg, 0, sizeof(msg));
@@ -169,7 +188,6 @@ int create_request(char *sender, char *path, char *receiver){
         perror("send_transfer_msg");
         exit(EXIT_FAILURE);
     }
-    //printf("[CHILD] Request sent:\n id: %d\n sender: %s\n receiver: %s\n path: %s\n", msg.req.id, msg.req.sender, msg.req.receiver, msg.req.path);
     send_string("Transfer request sent successfully\n");
     send_string("Waiting for response... I'm blocking\n");
     while (1) {
@@ -189,6 +207,10 @@ int create_request(char *sender, char *path, char *receiver){
     return 0;
 }
 
+/*
+ * accept a transfer request.
+ * Initializes a transfer_msg with the status ACCEPT, sends it via pipe_write
+ */
 int accept_req(int id, char *dest){
     transfer_msg msg;
     memset(&msg, 0, sizeof(msg));
@@ -205,6 +227,10 @@ int accept_req(int id, char *dest){
     return 0;
 }
 
+/*
+ * reject a transfer request.
+ * Initializes a transfer_msg with the status REJECT, sends it via pipe_write
+ */
 int reject_req(int id){
     transfer_msg msg;
     memset(&msg, 0, sizeof(msg));
@@ -222,6 +248,9 @@ int reject_req(int id){
     return 0;
 }
 
+/*
+ * Send a message to the server to let it know the name of the user
+ */
 int i_am_user(){
     transfer_msg msg;
     memset(&msg, 0, sizeof(msg));
@@ -239,6 +268,9 @@ int i_am_user(){
     return 0;
 }
 
+/*
+ * Send a message to the server to let it know the transfer request was handled.
+ */
 int send_handled_msg(int session){
     transfer_msg msg;
     memset(&msg, 0, sizeof(msg));
@@ -255,6 +287,10 @@ int send_handled_msg(int session){
 
     return 0;
 }
+
+/*
+ * Send a message to the server to let it know the transfer request was rejected.
+ */
 int send_rejected_msg(int session){
     transfer_msg msg;
     memset(&msg, 0, sizeof(msg));
@@ -272,7 +308,11 @@ int send_rejected_msg(int session){
     return 0;
 }
 
-
+/*
+ * Child handle message.
+ * Receives a message from the pipe and handles it.
+ * The messages can be: TRANSF_REQ, WHO_ARE_YOU
+ */
 int child_handle_msg(){
 
     printf("hellooo im child handle message function\n");
@@ -305,9 +345,11 @@ int child_handle_msg(){
     return 0;
 }
 
-
-//parent operations
-//parent operations
+/*
+ * Perform a transfer.
+ * Opens the source file and creates the destination file.
+ * Reads the source file and writes it to the destination file.
+ */
 int perform_transfer(char *source, char *dest, char *receiver){
     int src_fd, dest_fd;
     ssize_t nread;
@@ -327,14 +369,13 @@ int perform_transfer(char *source, char *dest, char *receiver){
     }
 
     // Open/Create destination file
-    // We open with 0644 initially, or 0600.
     printf("[PARENT] Opening destination file %s\n", dest);
     dest_fd = open(dest, O_WRONLY | O_CREAT | O_TRUNC, 0664);
     if (dest_fd < 0) {
         perror("[PARENT] Error opening destination file");
         close(src_fd);
         minimize_privileges();
-        return -1; // Or retry/handle
+        return -1;
     }
 
     // Copy loop
@@ -360,7 +401,6 @@ int perform_transfer(char *source, char *dest, char *receiver){
     if (pwd != NULL) {
         if (chown(dest, pwd->pw_uid, pwd->pw_gid) < 0) {
             perror("[PARENT] Error changing ownership");
-            // Not fatal to the transfer itself, but good to log
         }
     } else {
         printf("[PARENT] Warning: Receiver user '%s' not found, ownership not changed\n", receiver);
@@ -370,18 +410,16 @@ int perform_transfer(char *source, char *dest, char *receiver){
     return 0;
 }
 
-
-
+/*
+ * Parent handle message.
+ * Receives a message from the pipe and handles it.
+ * The messages can be: NEW_REQ, ACCEPT, REJECT, I_M_USER
+ */
 int parent_handle_msg(int i){
 
     transfer_msg msg;
     int ret = receive_transfer_msg(sessions[i].pipe_fd_read, &msg);
-    if (ret < 0){
-        //perror("read");
-        return -1;
-    }
-    if (ret == 0){
-        //printf("[PARENT]: pipe closed\n");
+    if (ret < 0 || ret == 0){
         return -1;
     }
     
@@ -392,16 +430,19 @@ int parent_handle_msg(int i){
     switch (msg.status){
         case NEW_REQ:
             printf("[MAIN] im handling a new request\n");
+            // create a new request
             transfer_request req;
             req.id = ++req_counter;
             strcpy(req.sender, msg.req.sender);
             strcpy(req.sender, sessions[i].username);
             strcpy(req.receiver, msg.req.receiver);
             strcpy(req.path, msg.req.path);
-            append_req(req);
 
+            // append the request to the list
+            append_req(req);
             append_dict(req.id, i);
 
+            // send who are you to all clients to know which client is the receiver
             transfer_msg who_are_you_msg;
             who_are_you_msg.status = WHO_ARE_YOU;
             for (int k = 0; k < MAX_CLIENTS; k++) {
@@ -410,24 +451,23 @@ int parent_handle_msg(int i){
                     send_transfer_msg(sessions[k].pipe_fd_write, &who_are_you_msg);
                 }
             }
-
-            // Received a new transfer request from a child.
-            // TODO: Forward to the receiver child.
-            //printf("Processing NEW_REQ from %s to %s file %s\n", msg.req.sender, msg.req.receiver, msg.req.path);
+            
             break;
 
-        case ACCEPT:    
-            // Received an accept request from a child.
-            // TODO: Forward to the sender child.
+        case ACCEPT:
             printf("Processing ACCEPT from %s to %s file %s\n", msg.req.sender, msg.req.receiver, msg.req.path);
 
+            // pop the request from the list
             if (pop_req_id(msg.req.id, &item_req) == 0) {
+                // check if the sender is the receiver
                 if (strcmp(msg.req.sender, item_req.receiver) == 0) {
+                    // perform the transfer
                     perform_transfer(item_req.path, msg.req.path, item_req.receiver);
                     transfer_msg handled_msg;
                     handled_msg.status = HANDLED;
                     handled_msg.req.id = item_req.id;
                     for (int i = 0; i < MAX_CLIENTS; i++) {
+                        // send the handled message to the sender
                         if (sessions[i].pid != -1 && strcmp(sessions[i].username, item_req.sender) == 0) {
                             send_transfer_msg(sessions[i].pipe_fd_write, &handled_msg);
                             break;
@@ -444,11 +484,9 @@ int parent_handle_msg(int i){
             break;
 
         case REJECT:
-            // Received a reject request from a child.
-            // TODO: Forward to the sender child.
-            
             if (pop_req_id(msg.req.id, &item_req) == 0) {
                 if (strcmp(msg.req.sender, item_req.receiver) == 0) {
+                    // send the rejected message to the sender
                     transfer_msg rejected_msg;
                     rejected_msg.status = REJECTED;
                     rejected_msg.req.id = item_req.id;

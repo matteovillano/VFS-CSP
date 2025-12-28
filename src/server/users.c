@@ -2,18 +2,12 @@
 #include "users.h"
 #include "server.h"
 
-
-
 extern int root_dir_fd;
 extern char root_dir_path[];
-
-User users[MAX_USERS];
 int user_count = 0;
-
+User users[MAX_USERS];
 
 /*
- * save_users_to_file
- * ------------------
  * Persists the current user list to disk.
  * Temporarily restores privileges to write to the protected users file.
  */
@@ -30,14 +24,21 @@ void save_users_to_file() {
     minimize_privileges();
 }
 
+/*
+ * Checks if a user with the given username exists in the current user list.
+ * Returns 0 if the user exists, -1 otherwise.
+ */
 int user_exists(char *username) {
-    //retrive_users();
     for (int i = 0; i < user_count; i++) {
         if (strcmp(users[i].username, username) == 0) return 0;
     }
     return -1;
 }
 
+/*
+ * Creates a new user in the user list.
+ * Persists the user list to disk.
+ */
 int create_user_persistance(char *username, int permissions) {
     restore_privileges();
     if (user_count >= MAX_USERS) return -1;
@@ -56,6 +57,10 @@ int create_user_persistance(char *username, int permissions) {
     return 0;
 }
 
+/*
+ * Deletes a user from the user list.
+ * Persists the user list to disk.
+ */
 int delete_user_persistance(char *username) {
     restore_privileges();
     int found = -1;
@@ -77,41 +82,51 @@ int delete_user_persistance(char *username) {
     return 0;
 }
 
+/*
+ * Retrieves the list of users from the users file (user.dat).
+ * Persists the current user list to disk.
+ */
 void retrive_users() {
-    //restore_privileges();
-
     printf("Retrieving users...\n");
+
     char path[2048];
-    resolve_path(root_dir_path, USERS_FILE, path);
+    resolve_path(root_dir_path, USERS_FILE, path); // resolve user file path in path
     printf("Path: %s\n", path);
-    int fd = open(path, O_RDONLY);
+
+    int fd = open(path, O_RDONLY); // open user file
     if (fd == -1) return;
 
+    // read user count
     if (read(fd, &user_count, sizeof(int)) != sizeof(int)) {
         user_count = 0;
         close(fd);
         return;
     }
-    
     if (user_count > MAX_USERS) user_count = MAX_USERS;
-    read(fd, users, sizeof(User) * user_count);
+
+    read(fd, users, sizeof(User) * user_count); // read user file
+
     close(fd);
+
     printf("Retrieved %d users.\n", user_count);
-    //minimize_privileges();
 }
 
-
+/*
+ * Creates a user folder in the root directory.
+ * Persists the user list to disk.
+ */
 int create_user_folder(char *username, int permissions) {
     restore_privileges();
     
-    mode_t old_umask = umask(0);
-    if (mkdirat(root_dir_fd, username, permissions) == -1) {
+    mode_t old_umask = umask(0); // set mask to 0
+    if (mkdirat(root_dir_fd, username, permissions) == -1) { // create user folder
         perror("mkdirat failed");
         minimize_privileges();
         return -1;
     }
-    umask(old_umask);
+    umask(old_umask); // restore mask
 
+    // get user id and group id
     struct passwd *pwd = getpwnam(username);
     if (pwd == NULL) {
         perror("getpwnam failed in create_user_folder");
@@ -119,6 +134,7 @@ int create_user_folder(char *username, int permissions) {
         return -1;
     }
 
+    // change owner
     if (fchownat(root_dir_fd, username, pwd->pw_uid, pwd->pw_gid, 0) == -1) {
         perror("fchownat failed");
         minimize_privileges();
@@ -129,7 +145,9 @@ int create_user_folder(char *username, int permissions) {
     return 0;
 }
 
-// Helper to recursively delete directory contents
+/*
+ * Recursively removes a directory and its contents.
+ */
 int remove_directory_recursive(int parent_fd, char *name) {
     int dfd = openat(parent_fd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
     if (dfd == -1) {
@@ -162,6 +180,9 @@ int remove_directory_recursive(int parent_fd, char *name) {
     return ret;
 }
 
+/*
+ * Removes the user directory
+ */
 int delete_user_folder(char *username) {
     restore_privileges();
     // Attempt to remove recursively
@@ -173,22 +194,18 @@ int delete_user_folder(char *username) {
     return 0;
 }
 
-
 /*
- * create_os_user
- * --------------
  * Creates a system user using the 'useradd' command.
- * Forks and execs 'useradd'. Uses get_real_gid() to assign consistent group.
- * Must run as root (privileges restored).
  */
 int create_os_user(char *username) {
-    
+    // restore priviliges to be root
     restore_privileges();
     if (geteuid() != 0) {
         printf("Not root, skipping OS user creation for %s\n", username);
         return -1;
     }
 
+    // fork and exec useradd
     pid_t pid = fork();
     if (pid < 0) {
         perror("Fork failed");
@@ -213,10 +230,12 @@ int create_os_user(char *username) {
             //error creating the user
             return -1;
         }
-        
     }
 }   
 
+/*
+ * Removes the user from the system
+ */
 int delete_os_user(char *username) {
     
     restore_privileges();
@@ -250,7 +269,7 @@ int delete_os_user(char *username) {
         if (WIFEXITED(status)) {
             int exit_code = WEXITSTATUS(status);
             // 0: Success
-            // 6: Specified user doesn't exist (can happen if inconsistencies) - arguably success if goal is "user gone"
+            // 6: Specified user doesn't exist
             // 12: Cannot remove home dir / mail spool issues
             if (exit_code == 0 || exit_code == 6 || exit_code == 12) {
                 return 0;
@@ -261,30 +280,28 @@ int delete_os_user(char *username) {
     }
 }
 
-
-
 /*
- * create_user
- * -----------
- * Orchestrates the creation of a full user entity:
+ * create the user entity:
  * 1. Creates OS user.
  * 2. adds user to persistence file.
  * 3. Creates user specific folder.
- * Handles rollback if any step fails.
+ * If something fails, it will try to rollback.
  */
 int create_user(char *username, int permissions) {
-    
+    // Check if there is space for new users
     if (user_count >= MAX_USERS) {
         return -1;
     }
+    // Check if user already exists
     if (user_exists(username) == 0) {
         printf("err-user already exists\n");
         return -1;
     }
-    int os_user = create_os_user(username);
-    int persisnce_user = create_user_persistance(username, permissions);
-    int folder_user = create_user_folder(username, permissions);
+    int os_user = create_os_user(username); // create user in the OS
+    int persisnce_user = create_user_persistance(username, permissions); // add user to persistence file (user.dat)
+    int folder_user = create_user_folder(username, permissions); // create user specific folder
 
+    // if something fails, rollback
     if (os_user < 0 || persisnce_user < 0 || folder_user < 0) {
         if(os_user == 0) {
             delete_os_user(username);
@@ -298,15 +315,11 @@ int create_user(char *username, int permissions) {
         printf("err-user not created\n");
         return -1;
     } else {
-        //printf("user created\n");
         return 0;
     }
-
-    
-    
-
 }
 
+/* it is not specified in the assignment but it can be a valid command
 int delete_user(char *username) {
     if (user_exists(username)) {
         printf("err-user does not exist\n");
@@ -324,3 +337,4 @@ int delete_user(char *username) {
         return 0;
     }
 }
+*/
