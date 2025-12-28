@@ -322,6 +322,7 @@ int op_upload(char *args[], int arg_count) {
     if (fd == -1) {
         perror("openat failed");
         close(new_socket);
+        send_string("err-Server error opening file");
         close(server_fd);
         writer_unlock(lock);
         release_file_lock(lock);
@@ -331,7 +332,7 @@ int op_upload(char *args[], int arg_count) {
 
     char buffer[BUFFER_SIZE];
     int n;
-    sleep(10);
+    if(background)sleep(10);
     while ((n = recv(new_socket, buffer, BUFFER_SIZE, 0)) > 0) {
         if (write(fd, buffer, n) != n) {
             perror("write failed");

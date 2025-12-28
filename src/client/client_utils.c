@@ -56,12 +56,14 @@ void handle_user_input() {
         if (c == '\n') {
             // User pressed Enter: send the message
             input_buffer[input_len] = '\n';
-            send(sockfd, input_buffer, input_len + 1, 0);
+            int ret = op_command(input_buffer);
+            if (ret == 0)
+                send(sockfd, input_buffer, input_len + 1, 0);
 
             // Print "You: ..." locally
             printf("\r\033[KYou: %.*s", input_len + 1, input_buffer);
 
-            op_command(input_buffer);
+            
             // Reset input buffer
             input_len = 0;
             memset(input_buffer, 0, BUFFER_SIZE);

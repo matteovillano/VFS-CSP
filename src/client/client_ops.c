@@ -5,10 +5,14 @@
 int op_command(char *command) {
     
     //printf("I execute the command: %s\n", command);
-    if (strncmp(command, "download ",9)==0)
+    if (strncmp(command, "download ",9)==0){
         op_download(command);
-    if (strncmp(command, "upload ",7)==0)
+        return -1;
+    }
+    if (strncmp(command, "upload ",7)==0){
         op_upload(command);
+        return -1;
+    }
     if (strcmp(command, "exit")==0)
         exit(0);
     
@@ -20,6 +24,8 @@ int op_command(char *command) {
 
 extern char server_ip[];
 extern int sockfd;
+extern char input_buffer[];
+extern int input_len;
 
 /*
  * op_download
@@ -192,6 +198,8 @@ int op_upload(char *command) {
         return -1; 
     }
 
+    send(sockfd, input_buffer, input_len + 1, 0);
+
     // Wait for server to send port
     char buffer[BUFFER_SIZE];
     // This recv blocks until server sends port or error.
@@ -247,12 +255,13 @@ int op_upload(char *command) {
             break;
         }
     }
+
     
     close(fd);
     close(data_sock);
     
     if (background) {
-        printf("[Background] Command: upload %s %s concluded\n", local_path, remote_path);
+        //printf("[Background] Command: upload %s %s concluded\n", local_path, remote_path);
         // Refresh prompt if we printed to stdout asynchronously?
         // User might be typing. 
         // Ideally we shouldn't mess with prompt, but requirement is just to notify.
