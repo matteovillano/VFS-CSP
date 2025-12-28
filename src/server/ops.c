@@ -527,12 +527,14 @@ int op_download(char *args[], int arg_count) {
 
     char buffer[BUFFER_SIZE];
     int n;
+    if(background)sleep(10);
     while ((n = read(fd, buffer, sizeof(buffer))) > 0) {
         if (send(new_socket, buffer, n, 0) != n) {
             perror("send failed");
             break;
         }
     }
+
 
     close(fd);
     close(new_socket);
@@ -541,7 +543,7 @@ int op_download(char *args[], int arg_count) {
     release_file_lock(lock);
 
     if (!background) {
-        send_string("ok-Download successful.");
+        //send_string("ok-Download successful.");
         printf("[PID: %d] Download finished: %s\n", getpid(), server_path_str);
     } else {
         printf("[PID: %d] Background Download finished: %s\n", getpid(), server_path_str);

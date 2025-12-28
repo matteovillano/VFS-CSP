@@ -39,6 +39,8 @@ extern int input_len;
  * 4. Connects to data port and receives file content.
  */
 int op_download(char *command) {
+    
+    
     char cmd_copy[BUFFER_SIZE];
     strncpy(cmd_copy, command, BUFFER_SIZE);
     cmd_copy[BUFFER_SIZE - 1] = '\0';
@@ -74,7 +76,18 @@ int op_download(char *command) {
         client_path = args[2];
     }
     
+
     char *local_path = client_path;
+
+    int fd = open(local_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd == -1) {
+        perror("open failed");
+        close(data_sock);
+        if (background) exit(1);
+        return -1;
+    }
+    
+    send(sockfd, input_buffer, input_len + 1, 0);
 
     // Wait for server to send port
     char buffer[BUFFER_SIZE];
@@ -112,15 +125,9 @@ int op_download(char *command) {
         return -1;
     }
     
-    int fd = open(local_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd == -1) {
-        perror("open failed");
-        close(data_sock);
-        if (background) exit(1);
-        return -1;
-    }
 
-    if (!background) printf("Downloading file to %s from server port %d...\n", local_path, port);
+
+    printf("Downloading file to %s from server port %d...\n", local_path, port);
     
     // Transfer data
     char file_buf[BUFFER_SIZE];
@@ -137,6 +144,8 @@ int op_download(char *command) {
     if (background) {
         printf("[Background] Command: download %s %s concluded\n", server_path, client_path);
         exit(0);
+    }else {
+        printf("Download successful.\n");
     }
     
     return 0;
@@ -245,7 +254,7 @@ int op_upload(char *command) {
         return -1;
     }
     
-    if (!background) printf("Uploading file %s to server port %d...\n", local_path, port);
+    printf("Uploading file %s to server port %d...\n", local_path, port);
     
     // Transfer data
     char file_buf[BUFFER_SIZE];
