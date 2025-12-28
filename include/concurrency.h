@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include "common.h"
 
 #define MAX_LOCKS 100
 

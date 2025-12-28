@@ -112,6 +112,12 @@ void release_file_lock(FileLock* lock) {
 void reader_lock(FileLock* lock) {
     if (lock == NULL) return;
 
+    int sem_value;
+    sem_getvalue(&lock->write_sem, &sem_value);
+    if (sem_value == 0) {
+        send_string("waiting to read...");
+    }
+
     sem_wait(&lock->mutex);
     lock->readers_count++;
     if (lock->readers_count == 1) {
@@ -138,6 +144,13 @@ void reader_unlock(FileLock* lock) {
  */
 void writer_lock(FileLock* lock) {
     if (lock == NULL) return;
+
+    int sem_value;
+    sem_getvalue(&lock->write_sem, &sem_value);
+    if (sem_value == 0) {
+        send_string("waiting to write...");
+    }
+
     sem_wait(&lock->write_sem);
 }
 

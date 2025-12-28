@@ -144,7 +144,7 @@ int op_download(char *command) {
     close(data_sock);
     
     if (background) {
-        printf("[Background] Command: download %s %s concluded\n", server_path, client_path);
+        printf("[Background] Command: download %s %s concluded\n> ", server_path, client_path);
         exit(0);
     }else {
         printf("Download successful.\n");
@@ -255,7 +255,7 @@ int op_upload(char *command) {
         return -1;
     }
     
-    printf("Client: Uploading file %s to server port %d...\n", local_path, port);
+    printf("Client: Uploading file %s to server port %d...\n> ", local_path, port);
     
     // Transfer data
     char file_buf[BUFFER_SIZE];
