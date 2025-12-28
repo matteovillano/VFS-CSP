@@ -82,7 +82,6 @@ int op_download(char *command) {
     int fd = open(local_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd == -1) {
         perror("open failed");
-        close(data_sock);
         if (background) exit(1);
         return -1;
     }
@@ -180,7 +179,7 @@ int op_upload(char *command) {
     
     int background = 0;
     char *local_path = NULL;
-    char *remote_path = NULL;
+    //char *remote_path = NULL;
 
     // Check for -b flag
     // Format: upload -b <local> <remote> OR upload <local> <remote>
@@ -191,14 +190,14 @@ int op_upload(char *command) {
              return -1;
         }
         local_path = args[2];
-        remote_path = args[3];
+        //remote_path = args[3];
     } else {
         if (arg_count < 3) {
             printf("Usage: upload <local_path> <remote_path>\n");
             return -1;
         }
         local_path = args[1];
-        remote_path = args[2];
+        //remote_path = args[2];
     }
     
     int fd = open(local_path, O_RDONLY);
