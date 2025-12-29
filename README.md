@@ -1,4 +1,4 @@
-# Secure File Sharing System: A Human-Friendly Guide
+# Secure Virtual File System: Guide
 
 Welcome! This document will guide you through setting up and using your new Secure Client-Server File System. We've designed this to be robust and secure, but also easy to use.
 
@@ -42,8 +42,8 @@ sudo ./server <root_directory> <ip_address> <port>
 
 **Example:**
 ```bash
-# Let's start the server on localhost port 8080 and save files in /tmp/server_root
-sudo ./server /tmp/server_root 127.0.0.1 8080
+# Let's start the server on localhost port 8080 and save files in ./root
+sudo ./server root 127.0.0.1 8080
 ```
 
 **What you'll see:**
@@ -77,6 +77,14 @@ You are now connected! The `>` prompt means the system is ready for your command
 
 Here is everything you can do once you're connected.
 
+### Creating a User (Server Side)
+
+Before you can log in, you must create a user from the server terminal (where you ran `sudo ./server`).
+
+*   **Command**: `create_user <username> <permissions>`
+*   **Example**: `create_user user1 0755`
+*   **Expected Output**: `user created`
+
 ### Logging In
 Before you can touch any files, you need to identify yourself.
 
@@ -94,11 +102,14 @@ Once logged in, you can manage files in your personal directory.
 
 *   **Create something new**:
     *   **File**: `create <filename> <permissions>` (e.g., `create notes.txt 0644`)
+        *   Expected Output: `ok-File <filename> created successfully with permissions <permissions>.`
     *   **Folder**: `create -d <dirname> <permissions>` (e.g., `create -d photos 0755`)
+        *   Expected Output: `ok-Directory <dirname> created successfully with permissions <permissions>.`
     *   *Note*: Permissions are in octal (like 0644 or 0755).
 
 *   **Delete something**:
     *   Command: `delete <path>` (e.g., `delete notes.txt`)
+    *   Expected Output: `ok-Deleted <path>`
     *   *Careful! This is permanent.*
 
 *   **Move or Rename**:
