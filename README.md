@@ -126,6 +126,7 @@ Once logged in, you can manage files in your personal directory.
 *   **Change Permissions**:
     *   Command: `chmod <path> <permissions>`
     *   Example: `chmod script.sh 0777`
+    *   Expected Output: `Server: ok-Permissions for <path> changed to <permissions>.`
 
 *   **Change Directory**:
     *   Command: `cd <path>`
@@ -156,11 +157,23 @@ You can move files between your computer and the server. Both commands support a
     *   Command: `upload <local_file> <server_path>`
     *   Example: `upload myphoto.jpg images/photo.jpg`
     *   Background mode: `upload -b myphoto.jpg images/photo.jpg`
+    *   Expected Output: `Server: ok-Upload successful.`
+    *   Expected Output (Background):
+        ```
+        Client: Uploading file <local_file> to server port <port>...
+        Server: [Background] Command: upload <server_path> <local_file> concluded
+        ```
 
 *   **Download from Server**:
     *   Command: `download <server_file> <local_path>`
     *   Example: `download report.pdf ~/Downloads/report.pdf`
     *   Background mode: `download -b report.pdf ~/Downloads/report.pdf`
+    *   Expected Output: `Download successful.`
+    *   Expected Output (Background):
+        ```
+        Client: Downloading file to <local_path> from server port <port>...
+        [Background] Command: download <server_file> <local_path> concluded
+        ```
 
 ### Sharing with Friends (User-to-User)
 
