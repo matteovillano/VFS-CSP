@@ -183,10 +183,20 @@ Want to send a file directly to another user on the system? We've got you covere
     *   Command: `transfer_request <your_file> <username>`
     *   Example: `transfer_request project.zip alice`
     *   *Status*: You'll wait until they respond.
+    *   Expected Output:
+        ```
+        Waiting for response... I'm blocking
+        Server: Transfer request handled successfully
+        ```
+    *   Expected Output (if rejected):
+        ```
+        Waiting for response... I'm blocking
+        Server: err-Transfer rejected by user
+        ```
 
 2.  **Accept a Transfer** (If you are the receiver):
-    *   Command: `accept <request_id> <save_as_name>`
-    *   Example: `accept 1 project.zip`
+    *   Command: `accept <save_as_name> <request_id>`
+    *   Example: `accept project.zip 1`
 
 3.  **Reject a Transfer**:
     *   Command: `reject <request_id>`
