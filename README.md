@@ -1,10 +1,10 @@
-# Secure Virtual File System: Guide
+# Computer System and programming winter project
 
-Welcome! This document will guide you through setting up and using your new Secure Client-Server File System. We've designed this to be robust and secure, but also easy to use.
+This document will guide you through setting up and using this Client-Server File System.
 
 ## 1. Getting Started
 
-Before we can run anything, we need to build the project. We've included a `Makefile` to handle all the heavy lifting for you.
+Before we can run anything, we need to build the project. We've included a `Makefile`
 
 Just open your terminal in the project folder and type:
 
@@ -14,7 +14,7 @@ make
 
 This command builds two executable files: `server` (the brain of the operation) and `client` (what you'll use to talk to the server).
 
-If you ever want to start fresh and remove these built files, simply run:
+If you ever want to remove these built files, simply run:
 
 ```bash
 make clean
@@ -26,12 +26,12 @@ To get everything working, you'll need to start the server first, and then conne
 
 ### Step 1: Start the Server
 
-The server does some heavy lifting (like managing users and permissions), so it needs to run with **root privileges**. We also need to tell it where to store everyone's files.
+The server performs some operations like creating users on the OS, and other high priviledges task. So it needs to run with sudo. We also need to tell it where to store everyone's files and some metadata.
 
 **How to run it:**
 
 You need to provide three arguments:
-1.  **Root Directory**: Where you want all the files to be saved. **Bonus:** If this folder doesn't exist yet, we'll create it for you automatically!
+1.  **Root Directory**: Where you want all the files to be saved. If this folder doesn't exist yet, we'll create it for you automatically!
 2.  **IP Address**: Usually `127.0.0.1` (localhost) if you're testing on your own machine.
 3.  **Port**: A number like `8080`.
 
@@ -73,20 +73,21 @@ Connected to server at 127.0.0.1:8080
 ```
 You are now connected! The `>` prompt means the system is ready for your commands.
 
-## 3. Using the System
+## 3. Server Administration
+
+If you are looking at the server terminal (where you ran `sudo ./server`), you can perform those commands:
+
+*   **Create a new user**: `create_user <username> <permissions>`
+    *   This sets up a new system user and their home folder.
+*   **Shut it down**: `exit`
+    *   Stops the server and cleans everything up.
+
+## 4. Using the System
 
 Here is everything you can do once you're connected.
 
-### Creating a User (Server Side)
-
-Before you can log in, you must create a user from the server terminal (where you ran `sudo ./server`).
-
-*   **Command**: `create_user <username> <permissions>`
-*   **Example**: `create_user user1 0755`
-*   **Expected Output**: `user created`
-
 ### Logging In
-Before you can touch any files, you need to identify yourself.
+Now from the client terminal, you can perform those commands:
 
 *   **Command**: `login <username>`
 *   **Example**: `login user1`
@@ -116,7 +117,7 @@ Once logged in, you can manage files in your personal directory.
 *   **Delete something**:
     *   Command: `delete <path>` (e.g., `delete notes.txt`)
     *   Expected Output: `ok-Deleted <path>`
-    *   *Careful! This is permanent.*
+    *   *Note!* This is permanent.
 
 *   **Move or Rename**:
     *   Command: `move <source> <destination>`
@@ -137,7 +138,7 @@ Once logged in, you can manage files in your personal directory.
 
 *   **Read a file**:
     *   Command: `read <filename>`
-    *   Want to start reading from the middle? Use `read -offset=10 <filename>`.
+    *   To start reading from a specific point it's possible to use `read -offset=10 <filename>`.
     *   Expected Output:
         ```
         Server: ok-
@@ -146,7 +147,7 @@ Once logged in, you can manage files in your personal directory.
 
 *   **Write to a file**:
     *   Command: `write <filename>`
-    *   Type your text, and when you're done, type `EOF` on a new line to save it.
+    *   Type your text, and when finished, type `EOF` on a new line to save.
     *   Expected Output: `Server: ok-Waiting for data... (Type 'EOF' to finish)`
 
 ### Uploading and Downloading
@@ -177,7 +178,7 @@ You can move files between your computer and the server. Both commands support a
 
 ### Sharing with Friends (User-to-User)
 
-Want to send a file directly to another user on the system? We've got you covered.
+You can share files with other users on the system. 
 
 1.  **Send a Request**:
     *   Command: `transfer_request <your_file> <username>`
@@ -194,39 +195,34 @@ Want to send a file directly to another user on the system? We've got you covere
         Server: err-Transfer rejected by user
         ```
 
-2.  **Accept a Transfer** (If you are the receiver):
+2.  **Accept a Transfer** (receiver):
     *   Command: `accept <save_as_name> <request_id>`
     *   Example: `accept project.zip 1`
 
-3.  **Reject a Transfer**:
+3.  **Reject a Transfer** (receiver):
     *   Command: `reject <request_id>`
     *   Example: `reject 1`
 
-## 4. Server Administration
+### Exiting
+To terminate the client:
 
-If you are looking at the server terminal (where you ran `sudo ./server`), you have a few admin superpowers:
-
-*   **Create a new user**: `create_user <username> <permissions>`
-    *   This sets up a new system user and their home folder.
-*   **Shut it down**: `exit`
-    *   Stops the server and cleans everything up.
+*   **Command**: `exit`
 
 ## 5. Concurrency Handling
 
-The system implements advanced concurrency mechanisms to ensure data integrity while allowing multiple users to access files simultaneously.
+To handle concurrency the system implements a mechanism to prevent multiple users to access simultaneously the same resources.
 
-*   **Shared Memory**: The server uses shared memory (`mmap`) to maintain the state of file locks across all processes (parent and children).
-*   **Reader-Writer Locks**: We use a custom implementation of Reader-Writer locks using semaphores.
+*   **Shared Memory**: The server uses a shared memory to maintain the state of file locks across all processes (parent and children).
+*   **Reader-Writer Locks**: We use a Reader-Writer locks implementation using semaphores.
     *   **Multiple Readers**: multiple users can read the same file at the same time without blocking each other.
-    *   **Exclusive Writers**: When a user is writing to a file (or uploading), they get exclusive access. No one else can read or write to that file until they are done.
-*   **Waiting**: If you try to access a file that is currently locked by someone else (e.g., trying to read a file while someone is writing to it), your command will wait automatically. You'll see a message like `waiting to read...` or `waiting to write...`, and the operation will proceed as soon as the file becomes available.
+    *   **Exclusive Writers**: When a user is writing to a file (or uploading), no one else can read or write to that file until they are done.
+*   **Waiting**: If you try to access a file that is currently locked by someone else (trying to read a file while someone is writing to it), your command will wait automatically. You'll see a message like `waiting to read...` or `waiting to write...`, and the operation will proceed as soon as the file becomes available.
 
 ## 6. How File Transfers Work
 
-Direct user-to-user file transfers are coordinated by the main server process:
+Direct file transfers are coordinated by the main server process exchaingin messages with the childs trough pipes:
 
-1.  **Request**: When you send a transfer request, your client tells your server process.
-2.  **Coordination**: Your server process sends a message through a pipe to the **Parent Server Process**.
-3.  **Forwarding**: The Parent Server finds the recipient's server process and forwards the request.
-4.  **Pending List**: The Parent Server keeps a list of all pending requests, matching `accept` or `reject` commands to the original sender.
-5.  **Completion**: Once accepted, the server securely copies the file from the sender's folder to the recipient's folder, handling all permissions automatically.
+1.  **Request**: Your server process sends a message through a pipe to the **Parent Server Process**.
+2.  **Forwarding**: The Parent Server finds the recipient's server process and forwards the request.
+3.  **Pending List**: The Parent Server keeps a list of all pending requests, waiting for `accept` or `reject` commands from the recipient.
+4.  **Completion**: Once accepted, the server securely copies the file from the sender's folder to the recipient's folder.

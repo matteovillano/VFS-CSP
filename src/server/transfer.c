@@ -105,7 +105,7 @@ int pop_req_id(int id, transfer_request *req) {
 }
 
 /*
- * write exactly 'n' bytes.
+ * sends exactly 'n' bytes on the pipe.
  */
 int write_n(int fd, void *vptr, size_t n) {
     size_t nleft;
@@ -128,7 +128,7 @@ int write_n(int fd, void *vptr, size_t n) {
     return 0;
 }
 
-// read exactly 'n' bytes
+// read exactly 'n' bytes from the pipe.
 int read_n(int fd, void *vptr, size_t n) {
     size_t nleft;
     ssize_t nread;
@@ -249,7 +249,7 @@ int reject_req(int id){
 }
 
 /*
- * Send a message to the server to let it know the name of the user
+ * Send a message to the server to let it know it's own username
  */
 int i_am_user(){
     transfer_msg msg;
@@ -327,6 +327,7 @@ int child_handle_msg(){
 
     printf("Child received message:\n id: %d\n status: %d\n sender: %s\n receiver: %s\n path: %s\n", msg.req.id, msg.status, msg.req.sender, msg.req.receiver, msg.req.path);
     
+    //handle different message types
     switch (msg.status){
         case TRANSF_REQ:
             char buf[2048];    
@@ -349,6 +350,7 @@ int child_handle_msg(){
  * Perform a transfer.
  * Opens the source file and creates the destination file.
  * Reads the source file and writes it to the destination file.
+ * (Performed by parent process)
  */
 int perform_transfer(char *source, char *dest, char *receiver){
     int src_fd, dest_fd;
@@ -427,6 +429,7 @@ int parent_handle_msg(int i){
 
     transfer_request item_req;
 
+    // handle different message types
     switch (msg.status){
         case NEW_REQ:
             printf("[MAIN] im handling a new request\n");
@@ -503,7 +506,6 @@ int parent_handle_msg(int i){
                     append_req(item_req);
                 }
             }
-            
             
             printf("Processing REJECT from %s to %s file %s\n", msg.req.sender, msg.req.receiver, msg.req.path);
             break;
