@@ -210,3 +210,23 @@ If you are looking at the server terminal (where you ran `sudo ./server`), you h
     *   This sets up a new system user and their home folder.
 *   **Shut it down**: `exit`
     *   Stops the server and cleans everything up.
+
+## 5. Concurrency Handling
+
+The system implements advanced concurrency mechanisms to ensure data integrity while allowing multiple users to access files simultaneously.
+
+*   **Shared Memory**: The server uses shared memory (`mmap`) to maintain the state of file locks across all processes (parent and children).
+*   **Reader-Writer Locks**: We use a custom implementation of Reader-Writer locks using semaphores.
+    *   **Multiple Readers**: multiple users can read the same file at the same time without blocking each other.
+    *   **Exclusive Writers**: When a user is writing to a file (or uploading), they get exclusive access. No one else can read or write to that file until they are done.
+*   **Waiting**: If you try to access a file that is currently locked by someone else (e.g., trying to read a file while someone is writing to it), your command will wait automatically. You'll see a message like `waiting to read...` or `waiting to write...`, and the operation will proceed as soon as the file becomes available.
+
+## 6. How File Transfers Work
+
+Direct user-to-user file transfers are coordinated by the main server process:
+
+1.  **Request**: When you send a transfer request, your client tells your server process.
+2.  **Coordination**: Your server process sends a message through a pipe to the **Parent Server Process**.
+3.  **Forwarding**: The Parent Server finds the recipient's server process and forwards the request.
+4.  **Pending List**: The Parent Server keeps a list of all pending requests, matching `accept` or `reject` commands to the original sender.
+5.  **Completion**: Once accepted, the server securely copies the file from the sender's folder to the recipient's folder, handling all permissions automatically.
