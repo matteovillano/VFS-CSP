@@ -90,7 +90,7 @@ Before you can touch any files, you need to identify yourself.
 
 *   **Command**: `login <username>`
 *   **Example**: `login user1`
-*   **Success**: You'll see `> Welcome user1`, and your prompt will update.
+*   **Success**: You'll see `Server: Login successful`, and your prompt will update.
 
 ### Managing Your Files
 
@@ -99,6 +99,12 @@ Once logged in, you can manage files in your personal directory.
 *   **See what's there**:
     *   Command: `list` or `list <foldername>`
     *   Shows you filenames, sizes, and permissions.
+    *   Expected Output:
+        ```
+        Server: ok-
+        ..      Size: 4096      Perms: 777
+        .       Size: 4096      Perms: 755
+        ```
 
 *   **Create something new**:
     *   **File**: `create <filename> <permissions>` (e.g., `create notes.txt 0644`)
@@ -115,6 +121,7 @@ Once logged in, you can manage files in your personal directory.
 *   **Move or Rename**:
     *   Command: `move <source> <destination>`
     *   Example: `move notes.txt old_notes.txt` (renames the file)
+    *   Expected Output: `ok-Moved <source> to <destination>.`
 
 *   **Change Permissions**:
     *   Command: `chmod <path> <permissions>`
@@ -123,16 +130,23 @@ Once logged in, you can manage files in your personal directory.
 *   **Change Directory**:
     *   Command: `cd <path>`
     *   Example: `cd photos`
+    *   Expected Output: `Server: ok-Directory changed successfully.`
 
 ### Reading and Writing
 
 *   **Read a file**:
     *   Command: `read <filename>`
     *   Want to start reading from the middle? Use `read -offset=10 <filename>`.
+    *   Expected Output:
+        ```
+        Server: ok-
+        Hello world!
+        ```
 
 *   **Write to a file**:
     *   Command: `write <filename>`
     *   Type your text, and when you're done, type `EOF` on a new line to save it.
+    *   Expected Output: `Server: ok-Waiting for data... (Type 'EOF' to finish)`
 
 ### Uploading and Downloading
 
