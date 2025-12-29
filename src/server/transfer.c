@@ -327,7 +327,7 @@ int child_handle_msg(){
 
     printf("Child received message:\n id: %d\n status: %d\n sender: %s\n receiver: %s\n path: %s\n", msg.req.id, msg.status, msg.req.sender, msg.req.receiver, msg.req.path);
     
-    //handle different message types
+    // handle different message types
     switch (msg.status){
         case TRANSF_REQ:
             char buf[2048];    

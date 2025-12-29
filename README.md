@@ -1,4 +1,4 @@
-# Computer System and programming winter project
+# Computer System and programming: winter project
 
 This document will guide you through setting up and using this Client-Server File System.
 
